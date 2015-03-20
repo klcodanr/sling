@@ -42,6 +42,16 @@ DOWNLOAD="/tmp/sling-build"
 PORT="8080"
 STOP_CODE=0
 
+# Make sure maven has enough memory
+if [ -n "$MAVEN_OPTS" ]; then
+	MACHINE_TYPE=`uname -m`
+	if [ ${MACHINE_TYPE} == 'x86_64' ]; then
+		export MAVEN_OPTS="-Xmx512M -XX:MaxPermSize=512M"
+	else
+		export MAVEN_OPTS="-Xmx256M -XX:MaxPermSize=256M"
+	fi
+fi
+
 while getopts "h?d:p:x" opt; do
 	case "$opt" in
 	h|\?)

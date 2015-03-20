@@ -8,21 +8,41 @@ function print_help {
 	echo "${bold}Parameters:${normal}"
 	echo "     -h/?    Display this message."
 	echo "     -d      (optional) set the download directory, default is /tmp/sling-build"
-	echo "     -k      (optional) kills the Sling process after the build and tests have completed"
 	echo "     -p      (optional) the port to start Sling on"
 	echo "     -x      (optional) skips the deployment and integration tests for this build, will not start Sling"
 	exit $STOP_CODE
 }
+
+function do_cleanup {
+	echo "################################################################################"
+	echo "                                Cleaning Up                                     "
+	echo "################################################################################"
+	echo "Cleaning up Sling Trunk build artifacts..."
+	mvn clean -f ${DOWNLOAD}/build/sling/pom.xml > /dev/null 2>&1
+	if [ -n "$PID" ]; then
+		if ps -p $PID > /dev/null 2>&1; then
+			kill $PID
+			echo "Stopped Sling process $PID..."
+		else
+			echo "Process ${PID} not running..."
+		fi
+	fi
+	echo "################################################################################"
+
+	exit $STOP_CODE
+}
+
+# trap ctrl-c and call ctrl_c()
+trap do_cleanup INT
 
 # Initialize our variables
 STAGING=$1
 NO_DEPLOY=0
 DOWNLOAD="/tmp/sling-build"
 PORT="8080"
-KILL=0
 STOP_CODE=0
 
-while getopts "h?d:p:xk" opt; do
+while getopts "h?d:p:x" opt; do
 	case "$opt" in
 	h|\?)
 		print_help
@@ -30,8 +50,6 @@ while getopts "h?d:p:xk" opt; do
 	d)  DOWNLOAD=$OPTARG
 		;;
 	x)  NO_DEPLOY=1
-		;;
-	k)  KILL=1
 		;;
 	p)  PORT=$OPTARG
 		;;
@@ -54,7 +72,7 @@ mkdir -p ${DOWNLOAD}/staging 2>/dev/null
 if [ ! -e "${DOWNLOAD}/${STAGING}" ]
 then
 	echo "################################################################################"
-	echo "						   DOWNLOAD STAGED REPOSITORY						   "
+	echo "                          DOWNLOAD STAGED REPOSITORY                            "
 	echo "################################################################################"
 	
 	mkdir -p ${DOWNLOAD}/staging/${STAGING}
@@ -70,7 +88,7 @@ then
 		"http://repository.apache.org/content/repositories/orgapachesling-${STAGING}/org/apache/sling/"
 else
 	echo "################################################################################"
-	echo "					   USING EXISTING STAGED REPOSITORY						 "
+	echo "                            USING EXISTING STAGED REPOSITORY                    "
 	echo "################################################################################"
 	echo "${DOWNLOAD}/staging/${STAGING}"
 fi
@@ -78,18 +96,19 @@ fi
 if [ "$NO_DEPLOY" -eq "0" ]
 then
 	echo "################################################################################"
-	echo "					   SETTING UP SLING INSTANCE								"
+	echo "                            SETTING UP SLING INSTANCE                           "
 	echo "################################################################################"
 	rm -r ${DOWNLOAD}/run 2> /dev/null
 	rm ${DOWNLOAD}/logs/sling-*.log 2> /dev/null
 	if [ ! -e "${DOWNLOAD}/build/sling" ]; then
-		echo "Downloading Sling SVN Repo to ${DOWNLOAD}/build/sling"
+		echo "Downloading Sling Trunk SVN Repo to ${DOWNLOAD}/build/sling..."
 		mkdir -p ${DOWNLOAD}/build/sling
 		svn co http://svn.apache.org/repos/asf/sling/trunk/ ${DOWNLOAD}/build/sling/ > /dev/null 2>&1
 	else 
+		echo "Updating Sling Trunk at ${DOWNLOAD}/build/sling..."
 		svn up ${DOWNLOAD}/build/sling/ > /dev/null 2>&1
 	fi	
-	echo "Building Sling trunk..."
+	echo "Building Sling Trunk..."
 	mvn clean install -f ${DOWNLOAD}/build/sling/pom.xml -DskipTests=true > ${DOWNLOAD}/logs/sling-build.log 2>&1
 	rc=$?
 	if [[ $rc != 0 ]] ; then
@@ -101,14 +120,30 @@ then
 	echo "Starting Sling instance at ${DOWNLOAD}/build/sling/launchpad/builder/target/*standalone.jar on port ${PORT}..."
 	java -jar ${DOWNLOAD}/build/sling/launchpad/builder/target/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > ${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
-	echo "Sling started successfully, process: $PID"
+	
+	# Wait until Sling starts...
+	i=0
+	while [ $i -le "10" ]
+	do
+		i=$(($i+1))
+		RES=$(curl -s -u admin:admin http://localhost:${PORT}/index.html)
+		if [[ $RES == *"Do not remove this comment, used for Launchpad integration tests"* ]]
+		then
+			echo "Sling started successfully, process: $PID"
+			break
+		else
+			echo "Waiting for Sling to start..."
+			sleep 30
+		fi
+	done
 fi
 
 echo "################################################################################"
-echo "						  RUNNING MAVEN BUILD(s)								"
+echo "                            RUNNING MAVEN BUILD(s)                              "
 echo "################################################################################"
 for i in `find "${DOWNLOAD}/staging/${STAGING}" -type f | grep '\.\(pom\)$'`
 do
+	# Parse the info required for build out of the pom
 	sed -e 's/xmlns="http:\/\/maven\.apache\.org\/POM\/4\.0\.0"//g' $i > ${DOWNLOAD}/staging/${STAGING}/pom.xml
 	TAG=`xmllint --xpath '/project/scm/connection/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
 	VERSION=`xmllint --xpath '/project/version/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
@@ -143,7 +178,7 @@ do
 done
 if [ "$NO_DEPLOY" -eq "0" ]; then 
 	echo "################################################################################"
-	echo "						  CHECK INTEGRATION TESTS							   "
+	echo "                             CHECK INTEGRATION TESTS                            "
 	echo "################################################################################"
 	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/sling/launchpad/integration-tests/pom.xml -Dtest=**/integrationtest/**/*Test.java > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
 	rc=$?
@@ -155,20 +190,4 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	fi
 fi
 
-
-if [ "$KILL" -eq "1" ]
-then
-	echo "################################################################################"
-	echo "						  Cleaning Up										   "
-	echo "################################################################################"
-	if ps -p $PID > /dev/null 2>&1; then
-		kill $PID
-		echo "Stopped Sling process $PID..."
-	else
-		echo "Process ${PID} not running"
-	fi
-fi
-
-echo "################################################################################"
-
-exit $STOP_CODE
+do_cleanup

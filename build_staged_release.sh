@@ -46,9 +46,9 @@ STOP_CODE=0
 if [ -n "$MAVEN_OPTS" ]; then
 	MACHINE_TYPE=`uname -m`
 	if [ ${MACHINE_TYPE} == 'x86_64' ]; then
-		export MAVEN_OPTS="-Xmx512M -XX:MaxPermSize=512M"
+		export MAVEN_OPTS="-Xmx512m -XX:MaxPermSize=512m"
 	else
-		export MAVEN_OPTS="-Xmx256M -XX:MaxPermSize=256M"
+		export MAVEN_OPTS="-Xmx256m -XX:MaxPermSize=256m"
 	fi
 fi
 

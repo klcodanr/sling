@@ -17,8 +17,6 @@ function do_cleanup {
 	echo "################################################################################"
 	echo "                                Cleaning Up                                     "
 	echo "################################################################################"
-	echo "Cleaning up Sling Trunk build artifacts..."
-	mvn clean -f ${DOWNLOAD}/build/sling/pom.xml > /dev/null 2>&1
 	if [ -n "$PID" ]; then
 		if ps -p $PID > /dev/null 2>&1; then
 			kill $PID
@@ -27,7 +25,10 @@ function do_cleanup {
 			echo "Process ${PID} not running..."
 		fi
 	fi
+	echo "Cleaning up Sling repo..."
+	rm -r ${DOWNLOAD}/run 2> /dev/null
 	echo "################################################################################"
+
 
 	exit $STOP_CODE
 }
@@ -108,27 +109,27 @@ then
 	echo "################################################################################"
 	echo "                            SETTING UP SLING INSTANCE                           "
 	echo "################################################################################"
-	rm -r ${DOWNLOAD}/run 2> /dev/null
-	rm ${DOWNLOAD}/logs/sling-*.log 2> /dev/null
-	if [ ! -e "${DOWNLOAD}/build/sling" ]; then
-		echo "Downloading Sling Trunk SVN Repo to ${DOWNLOAD}/build/sling..."
-		mkdir -p ${DOWNLOAD}/build/sling
-		svn co http://svn.apache.org/repos/asf/sling/trunk/ ${DOWNLOAD}/build/sling/ > /dev/null 2>&1
-	else 
-		echo "Updating Sling Trunk at ${DOWNLOAD}/build/sling..."
-		svn up ${DOWNLOAD}/build/sling/ > /dev/null 2>&1
-	fi	
-	echo "Building Sling Trunk..."
-	mvn clean install -f ${DOWNLOAD}/build/sling/pom.xml -DskipTests=true > ${DOWNLOAD}/logs/sling-build.log 2>&1
-	rc=$?
-	if [[ $rc != 0 ]] ; then
-		echo "mvn: BAD!! : Failed to build Sling trunk, see ${DOWNLOAD}/logs/sling-build.log"
-		exit 1
-	else
-		echo "mvn: GOOD : Successfully built Sling trunk"
-	fi
-	echo "Starting Sling instance at ${DOWNLOAD}/build/sling/launchpad/builder/target/*standalone.jar on port ${PORT}..."
-	java -jar ${DOWNLOAD}/build/sling/launchpad/builder/target/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > ${DOWNLOAD}/logs/sling-start.log 2>&1 &
+	mkdir -p ${DOWNLOAD}/run
+	echo "Downloading Sling Launchpad..."
+	mvn dependency:get -DremoteRepositories=http://repository.apache.org/snapshots -DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad -Dversion=8-SNAPSHOT -Dclassifier=standalone -DoutputDirectory=${DOWNLOAD}/run > ${DOWNLOAD}/logs/sling-download.log 2>&1 &
+	mvn dependency:copy -DremoteRepositories=http://repository.apache.org/snapshots -Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar:standalone -DoutputDirectory=/tmp/sling-build/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1 &
+	# For some reason this seems to report complete before it actually finished downloading...
+	i=0
+	while [ $i -le "10"  ]
+	do
+		echo "Waiting for download to finish..."
+		sleep 10
+		for f in ${DOWNLOAD}/run/*standalone.jar; do
+			if [ -e "$f" ]
+			then
+				i=11
+				break
+			fi
+		done
+		i=$(($i+1))
+	done
+	echo "Starting Sling instance at ${DOWNLOAD}/run/*standalone.jar on port ${PORT}..."
+	java -jar ${DOWNLOAD}/run/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > ${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
 	
 	# Wait until Sling starts...
@@ -143,13 +144,13 @@ then
 			break
 		else
 			echo "Waiting for Sling to start..."
-			sleep 30
+			sleep 10
 		fi
 	done
 fi
 
 echo "################################################################################"
-echo "                            RUNNING MAVEN BUILD(s)                              "
+echo "                            RUNNING MAVEN BUILD                                 "
 echo "################################################################################"
 for i in `find "${DOWNLOAD}/staging/${STAGING}" -type f | grep '\.\(pom\)$'`
 do
@@ -190,7 +191,15 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "################################################################################"
 	echo "                             CHECK INTEGRATION TESTS                            "
 	echo "################################################################################"
-	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/sling/launchpad/integration-tests/pom.xml -Dtest=**/integrationtest/**/*Test.java > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
+	if [ ! -e "${DOWNLOAD}/build/sling" ]; then
+		echo "Downloading Sling Integration Tests to ${DOWNLOAD}/build/integration-tests..."
+		mkdir -p ${DOWNLOAD}/build/integration-tests
+		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ ${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
+	else 
+		echo "Updating Sling Trunk at ${DOWNLOAD}/build/integration-tests..."
+		svn up ${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
+	fi
+	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/integration-tests/pom.xml -Dtest=**/integrationtest/**/*Test.java > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
 	rc=$?
 	if [[ $rc != 0 ]] ; then
 		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}-it.log"

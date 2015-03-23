@@ -111,23 +111,8 @@ then
 	echo "################################################################################"
 	mkdir -p ${DOWNLOAD}/run
 	echo "Downloading Sling Launchpad..."
-	mvn dependency:get -DremoteRepositories=http://repository.apache.org/snapshots -DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad -Dversion=8-SNAPSHOT -Dclassifier=standalone -DoutputDirectory=${DOWNLOAD}/run > ${DOWNLOAD}/logs/sling-download.log 2>&1 &
-	mvn dependency:copy -DremoteRepositories=http://repository.apache.org/snapshots -Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar:standalone -DoutputDirectory=/tmp/sling-build/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1 &
-	# For some reason this seems to report complete before it actually finished downloading...
-	i=0
-	while [ $i -le "10"  ]
-	do
-		echo "Waiting for download to finish..."
-		sleep 10
-		for f in ${DOWNLOAD}/run/*standalone.jar; do
-			if [ -e "$f" ]
-			then
-				i=11
-				break
-			fi
-		done
-		i=$(($i+1))
-	done
+	mvn dependency:get -DremoteRepositories=http://repository.apache.org/snapshots -DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad -Dversion=8-SNAPSHOT -Dclassifier=standalone -DoutputDirectory=${DOWNLOAD}/run > ${DOWNLOAD}/logs/sling-download.log 2>&1
+	mvn dependency:copy -DremoteRepositories=http://repository.apache.org/snapshots -Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar:standalone -DoutputDirectory=/tmp/sling-build/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1
 	echo "Starting Sling instance at ${DOWNLOAD}/run/*standalone.jar on port ${PORT}..."
 	java -jar ${DOWNLOAD}/run/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > ${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!

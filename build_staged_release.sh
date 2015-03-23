@@ -4,11 +4,13 @@ OPTIND=2
 function print_help {
 	bold=`tput bold`
 	normal=`tput sgr0`
-	echo "Usage: build_staged_release.sh <staging-number> [-d temp-directory] [-p port] [-hxk]"
+	echo "Usage: build_staged_release.sh <staging-number> [-d temp-directory] [-p port]  [-t test-pattern] [-hlx]"
 	echo "${bold}Parameters:${normal}"
 	echo "     -h/?    Display this message."
 	echo "     -d      (optional) set the download directory, default is /tmp/sling-build"
+	echo "     -l      (optional) leave the Sling instance running"
 	echo "     -p      (optional) the port to start Sling on"
+	echo "     -t      (optional) the tests to execute, defaults to **/integrationtest/**/*Test.java"
 	echo "     -x      (optional) skips the deployment and integration tests for this build, will not start Sling"
 	exit $STOP_CODE
 }
@@ -17,23 +19,20 @@ function do_cleanup {
 	echo "################################################################################"
 	echo "                                Cleaning Up                                     "
 	echo "################################################################################"
-	if [ -n "$PID" ]; then
+	if [ -n "$PID" ] && [ "$LEAVE_RUNNING" -eq "0" ]; then
 		if ps -p $PID > /dev/null 2>&1; then
 			kill $PID
 			echo "Stopped Sling process $PID..."
 		else
 			echo "Process ${PID} not running..."
 		fi
+		rm ${DOWNLOAD}/run/sling.pid
 	fi
-	echo "Cleaning up Sling repo..."
-	rm -r ${DOWNLOAD}/run 2> /dev/null
 	echo "################################################################################"
-
-
 	exit $STOP_CODE
 }
 
-# trap ctrl-c and call ctrl_c()
+# trap ctrl-c 
 trap do_cleanup INT
 
 # Initialize our variables
@@ -42,6 +41,8 @@ NO_DEPLOY=0
 DOWNLOAD="/tmp/sling-build"
 PORT="8080"
 STOP_CODE=0
+LEAVE_RUNNING=0
+TESTS="**/integrationtest/**/*Test.java"
 
 # Make sure maven has enough memory
 if [ -n "$MAVEN_OPTS" ]; then
@@ -53,32 +54,41 @@ if [ -n "$MAVEN_OPTS" ]; then
 	fi
 fi
 
-while getopts "h?d:p:x" opt; do
+while getopts "h?d:lp:t:x" opt; do
 	case "$opt" in
 	h|\?)
 		print_help
 		;;
 	d)  DOWNLOAD=$OPTARG
 		;;
-	x)  NO_DEPLOY=1
+	l)  LEAVE_RUNNING=1
 		;;
 	p)  PORT=$OPTARG
+		;;
+	t)	TESTS=$OPTARG
+		;;
+	x)  NO_DEPLOY=1
 		;;
 	esac
 done
 
-if [ "$STAGING" -eq "-1" ]
+# Ensure the user specified the staging ID
+if [ -z "$STAGING" ]
 then
 	print_help
 	exit 1
 fi
 
-echo "Creating directory $DOWNLOAD..."
-mkdir -p ${DOWNLOAD} 2>/dev/null
+# Make sure Sling isn't still running
+PID=`cat ${DOWNLOAD}/run/sling.pid`
+
+if [ ! -z "$PID" ] && [ ps -p $PID > /dev/null 2>&1 ]; then
+	echo "Sling appears to be running on process $PID, please stop Sling or remove the file ${DOWNLOAD}/run/sling.pid before continuing!"
+	exit 1
+fi
+
+rm -r ${DOWNLOAD}/run 2> /dev/null
 mkdir -p ${DOWNLOAD}/logs 2>/dev/null
-mkdir -p ${DOWNLOAD}/run 2>/dev/null
-mkdir -p ${DOWNLOAD}/build 2>/dev/null
-mkdir -p ${DOWNLOAD}/staging 2>/dev/null
 
 if [ ! -e "${DOWNLOAD}/${STAGING}" ]
 then
@@ -111,11 +121,18 @@ then
 	echo "################################################################################"
 	mkdir -p ${DOWNLOAD}/run
 	echo "Downloading Sling Launchpad..."
-	mvn dependency:get -DremoteRepositories=http://repository.apache.org/snapshots -DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad -Dversion=8-SNAPSHOT -Dclassifier=standalone -DoutputDirectory=${DOWNLOAD}/run > ${DOWNLOAD}/logs/sling-download.log 2>&1
-	mvn dependency:copy -DremoteRepositories=http://repository.apache.org/snapshots -Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar:standalone -DoutputDirectory=/tmp/sling-build/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1
+	mvn dependency:get -DremoteRepositories=http://repository.apache.org/snapshots \
+		-DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad \
+		-Dversion=8-SNAPSHOT -Dclassifier=standalone -DoutputDirectory=${DOWNLOAD}/run \
+		> ${DOWNLOAD}/logs/sling-download.log 2>&1
+	mvn dependency:copy -DremoteRepositories=http://repository.apache.org/snapshots \
+		-Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar:standalone \
+		-DoutputDirectory=/tmp/sling-build/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1
 	echo "Starting Sling instance at ${DOWNLOAD}/run/*standalone.jar on port ${PORT}..."
-	java -jar ${DOWNLOAD}/run/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > ${DOWNLOAD}/logs/sling-start.log 2>&1 &
+	java -jar ${DOWNLOAD}/run/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > \
+		${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
+	echo $! > ${DOWNLOAD}/run/sling.pid
 	
 	# Wait until Sling starts...
 	i=0
@@ -128,8 +145,8 @@ then
 			echo "Sling started successfully, process: $PID"
 			break
 		else
-			echo "Waiting for Sling to start..."
-			sleep 10
+			echo "($i of 10) Waiting for Sling to start..."
+			sleep 30
 		fi
 	done
 fi
@@ -159,7 +176,9 @@ do
 		echo "mvn: GOOD : Successfully built $ARTIFACT_ID"
 		if [ "$NO_DEPLOY" -eq "0" ]
 		then 
-			curl -s -u admin:admin -F "action=install" -F "_noredir_=_noredir_" -F "bundlefile=@${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/target/$ARTIFACT_ID-$VERSION.jar" -F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
+			curl -s -u admin:admin -F "action=install" -F "_noredir_=_noredir_" -F \
+				"bundlefile=@${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/target/$ARTIFACT_ID-$VERSION.jar" \
+				-F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
 			sleep 30
 			RES=$(curl -s -u admin:admin http://localhost:${PORT}/system/console/bundles/$ARTIFACT_ID -F action=start)
 			if [[ $RES == *"32"* ]]
@@ -179,12 +198,14 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	if [ ! -e "${DOWNLOAD}/build/sling" ]; then
 		echo "Downloading Sling Integration Tests to ${DOWNLOAD}/build/integration-tests..."
 		mkdir -p ${DOWNLOAD}/build/integration-tests
-		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ ${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
+		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ \
+			${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
 	else 
 		echo "Updating Sling Trunk at ${DOWNLOAD}/build/integration-tests..."
 		svn up ${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
 	fi
-	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/integration-tests/pom.xml -Dtest=**/integrationtest/**/*Test.java > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
+	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/integration-tests/pom.xml \
+		-Dtest=${TESTS} > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
 	rc=$?
 	if [[ $rc != 0 ]] ; then
 		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}-it.log"

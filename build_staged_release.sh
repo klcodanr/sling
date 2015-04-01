@@ -9,7 +9,7 @@ print_help () {
 	echo "     -h/?    Display this message."
 	echo "     -d      (optional) set the download directory, default is /tmp/sling-build"
 	echo "     -l      (optional) leave the Sling instance running"
-	echo "     -p      (optional) the port to start Sling on=
+	echo "     -p      (optional) the port to start Sling on"
 	echo "     -t      (optional) the tests to execute, defaults to **/integrationtest/**/*Test.java"
 	echo "     -x      (optional) skips the deployment and integration tests for this build, will not start Sling"
 	exit $STOP_CODE

@@ -54,8 +54,9 @@ if [ -n "$MAVEN_OPTS" ]; then
 	fi
 fi
 
-# Make sure xmllint is installed
+# Make sure xmllint and svn are installed
 command -v xmllint >/dev/null 2>&1 || { echo "This script requires xmllint but it's not installed.  Aborting." >&2; exit 1; }
+command -v svn >/dev/null 2>&1 || { echo "This script requires svn but it's not installed.  Aborting." >&2; exit 1; }
 
 while getopts "h?d:lp:t:x" opt; do
 	case "$opt" in

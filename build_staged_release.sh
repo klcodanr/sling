@@ -83,7 +83,7 @@ then
 fi
 
 # Make sure Sling isn't still running
-PID=`cat ${DOWNLOAD}/run/sling.pid`
+PID=`cat ${DOWNLOAD}/run/sling.pid 2> /dev/null`
 
 if [ ! -z "$PID" ] && [ ps -p $PID > /dev/null 2>&1 ]; then
 	echo "Sling appears to be running on process $PID, please stop Sling or remove the file ${DOWNLOAD}/run/sling.pid before continuing!"

@@ -144,7 +144,7 @@ then
 	do
 		i=$(($i+1))
 		RES=$(curl -s -u admin:admin http://localhost:${PORT}/index.html)
-		if [[ $RES == *"Do not remove this comment, used for Launchpad integration tests"* ]]
+		if [ $RES == *"Do not remove this comment, used for Launchpad integration tests"* ]
 		then
 			echo "Sling started successfully, process: $PID"
 			break
@@ -173,7 +173,7 @@ do
 	echo "Building tag ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
 	mvn clean install -f ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/pom.xml >> ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
 	rc=$?
-	if [[ $rc != 0 ]] ; then
+	if [ $rc != 0 ] ; then
 		echo "mvn: BAD!! : Failed to build $ARTIFACT_ID, see ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log"
 		exit 1
 	else 
@@ -211,7 +211,7 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/integration-tests/pom.xml \
 		-Dtest=${TESTS} > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
 	rc=$?
-	if [[ $rc != 0 ]] ; then
+	if [ $rc != 0 ] ; then
 		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}-it.log"
 		STOP_CODE=1
 	else

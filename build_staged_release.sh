@@ -57,6 +57,7 @@ fi
 # Make sure xmllint and svn are installed
 command -v xmllint >/dev/null 2>&1 || { echo "This script requires xmllint but it's not installed.  Aborting." >&2; exit 1; }
 command -v svn >/dev/null 2>&1 || { echo "This script requires svn but it's not installed.  Aborting." >&2; exit 1; }
+command -v mvn >/dev/null 2>&1 || { echo "This script requires mvn but it's not installed.  Aborting." >&2; exit 1; }
 
 while getopts "h?d:lp:t:x" opt; do
 	case "$opt" in
@@ -77,8 +78,7 @@ while getopts "h?d:lp:t:x" opt; do
 done
 
 # Ensure the user specified the staging ID
-if [ -z "$STAGING" ]
-then
+if [ -z "$STAGING" ]; then
 	print_help
 	exit 1
 fi
@@ -94,8 +94,7 @@ fi
 rm -r ${DOWNLOAD}/run 2> /dev/null
 mkdir -p ${DOWNLOAD}/logs 2>/dev/null
 
-if [ ! -e "${DOWNLOAD}/${STAGING}" ]
-then
+if [ ! -e "${DOWNLOAD}/staging/${STAGING}" ]; then
 	echo "################################################################################"
 	echo "                          DOWNLOAD STAGED REPOSITORY                            "
 	echo "################################################################################"
@@ -118,8 +117,7 @@ else
 	echo "${DOWNLOAD}/staging/${STAGING}"
 fi
 
-if [ "$NO_DEPLOY" -eq "0" ]
-then
+if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "################################################################################"
 	echo "                            SETTING UP SLING INSTANCE                           "
 	echo "################################################################################"
@@ -144,8 +142,8 @@ then
 	do
 		i=$(($i+1))
 		RES=$(curl -s -u admin:admin http://localhost:${PORT}/index.html)
-		if [ $RES == *"Do not remove this comment, used for Launchpad integration tests"* ]
-		then
+		
+		if [[ "$RES" =~ "Do not remove this comment, used for Launchpad integration tests" ]]; then
 			echo "Sling started successfully, process: $PID"
 			break
 		else
@@ -185,8 +183,7 @@ do
 				-F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
 			sleep 30
 			RES=$(curl -s -u admin:admin http://localhost:${PORT}/system/console/bundles/$ARTIFACT_ID -F action=start)
-			if [[ $RES == *"32"* ]]
-			then
+			if [[ "$RES" =~ "32" ]]; then
 				echo "bundle: GOOD : Successfully installed/started bundle $ARTIFACT_ID"
 			else
 				echo "bundle: BAD!! : Failed to install/start bundle $ARTIFACT_ID, response $RES"
@@ -211,7 +208,7 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/integration-tests/pom.xml \
 		-Dtest=${TESTS} > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
 	rc=$?
-	if [ $rc != 0 ] ; then
+	if [ $rc != 0 ]; then
 		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}-it.log"
 		STOP_CODE=1
 	else

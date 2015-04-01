@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 OPTIND=2
 
 print_help () {

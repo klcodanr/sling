@@ -1,7 +1,7 @@
 #!/bin/sh
 OPTIND=2
 
-function print_help {
+print_help () {
 	bold=`tput bold`
 	normal=`tput sgr0`
 	echo "Usage: build_staged_release.sh <staging-number> [-d temp-directory] [-p port]  [-t test-pattern] [-hlx]"
@@ -15,7 +15,7 @@ function print_help {
 	exit $STOP_CODE
 }
 
-function do_cleanup {
+do_cleanup () {
 	echo "################################################################################"
 	echo "                                Cleaning Up                                     "
 	echo "################################################################################"

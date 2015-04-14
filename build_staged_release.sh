@@ -59,9 +59,9 @@ command -v xmllint >/dev/null 2>&1 || { echo "This script requires xmllint but i
 command -v svn >/dev/null 2>&1 || { echo "This script requires svn but it's not installed.  Aborting." >&2; exit 1; }
 command -v mvn >/dev/null 2>&1 || { echo "This script requires mvn but it's not installed.  Aborting." >&2; exit 1; }
 
-while getopts "h?d:lp:t:x" opt; do
+while getopts "hd:lp:t:x" opt; do
 	case "$opt" in
-	h|\?)
+	h)
 		print_help
 		;;
 	d)  DOWNLOAD=$OPTARG
@@ -81,6 +81,11 @@ done
 if [ -z "$STAGING" ]; then
 	print_help
 	exit 1
+fi
+
+if [ "$STAGING" == "-h" ]; then
+	print_help
+	exit 0
 fi
 
 # Make sure Sling isn't still running

@@ -128,15 +128,14 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "################################################################################"
 	mkdir -p ${DOWNLOAD}/run
 	echo "Downloading Sling Launchpad..."
-	mvn dependency:get -DremoteRepositories=http://repository.apache.org/snapshots \
+	mvn org.apache.maven.plugins:maven-dependency-plugin:2.8:get -DremoteRepositories=http://repository.apache.org/snapshots \
 		-DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad \
-		-Dversion=8-SNAPSHOT -Dclassifier=standalone -DoutputDirectory=${DOWNLOAD}/run \
-		> ${DOWNLOAD}/logs/sling-download.log 2>&1
-	mvn dependency:copy -DremoteRepositories=http://repository.apache.org/snapshots \
-		-Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar:standalone \
-		-DoutputDirectory=/tmp/sling-build/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1
-	echo "Starting Sling instance at ${DOWNLOAD}/run/*standalone.jar on port ${PORT}..."
-	java -jar ${DOWNLOAD}/run/*standalone.jar -c ${DOWNLOAD}/run/sling -p $PORT > \
+		-Dversion=8-SNAPSHOT > ${DOWNLOAD}/logs/sling-download.log 2>&1
+	mvn org.apache.maven.plugins:maven-dependency-plugin:2.8:copy -DremoteRepositories=http://repository.apache.org/snapshots \
+		-Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar \
+		-DoutputDirectory=${DOWNLOAD}/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1
+	echo "Starting Sling instance at ${DOWNLOAD}/run/*launchpad*.jar on port ${PORT}..."
+	java -jar ${DOWNLOAD}/run/*launchpad*.jar -c ${DOWNLOAD}/run/sling -p $PORT > \
 		${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
 	echo $! > ${DOWNLOAD}/run/sling.pid

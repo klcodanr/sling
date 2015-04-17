@@ -220,7 +220,7 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "################################################################################"
 	echo "                             CHECK INTEGRATION TESTS                            "
 	echo "################################################################################"
-	if [ ! -e "${DOWNLOAD}/build/sling" ]; then
+	if [ ! -e "${DOWNLOAD}/build/integration-tests" ]; then
 		echo "Downloading Sling Integration Tests to ${DOWNLOAD}/build/integration-tests..."
 		mkdir -p ${DOWNLOAD}/build/integration-tests
 		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ \

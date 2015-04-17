@@ -1,15 +1,16 @@
 #!/bin/bash
 OPTIND=2
+bold=`tput bold`
+normal=`tput sgr0`
 
 print_help () {
-	bold=`tput bold`
-	normal=`tput sgr0`
 	echo "Usage: build_staged_release.sh <staging-number> [-d temp-directory] [-p port]  [-t test-pattern] [-hlx]"
 	echo "${bold}Parameters:${normal}"
 	echo "     -h/?    Display this message."
 	echo "     -d      (optional) set the download directory, default is /tmp/sling-build"
 	echo "     -l      (optional) leave the Sling instance running"
-	echo "     -p      (optional) the port to start Sling on"
+	echo "     -o      (optional) a comma separated lists of artifact IDs to execute.  Used if the projects need to be built in a particular order"
+	echo "     -p      (optional) the port on which to start Sling"
 	echo "     -t      (optional) the tests to execute, defaults to **/integrationtest/**/*Test.java"
 	echo "     -x      (optional) skips the deployment and integration tests for this build, will not start Sling"
 	exit $STOP_CODE
@@ -36,12 +37,13 @@ do_cleanup () {
 trap do_cleanup INT
 
 # Initialize our variables
-STAGING=$1
-NO_DEPLOY=0
 DOWNLOAD="/tmp/sling-build"
-PORT="8080"
-STOP_CODE=0
 LEAVE_RUNNING=0
+NO_DEPLOY=0
+ORDER=".pom"
+PORT="8080"
+STAGING=$1
+STOP_CODE=0
 TESTS="**/integrationtest/**/*Test.java"
 
 # Make sure maven has enough memory
@@ -59,7 +61,7 @@ command -v xmllint >/dev/null 2>&1 || { echo "This script requires xmllint but i
 command -v svn >/dev/null 2>&1 || { echo "This script requires svn but it's not installed.  Aborting." >&2; exit 1; }
 command -v mvn >/dev/null 2>&1 || { echo "This script requires mvn but it's not installed.  Aborting." >&2; exit 1; }
 
-while getopts "hd:lp:t:x" opt; do
+while getopts "hd:lo:p:t:x" opt; do
 	case "$opt" in
 	h)
 		print_help
@@ -67,6 +69,8 @@ while getopts "hd:lp:t:x" opt; do
 	d)  DOWNLOAD=$OPTARG
 		;;
 	l)  LEAVE_RUNNING=1
+		;;
+	o)  ORDER=$OPTARG
 		;;
 	p)  PORT=$OPTARG
 		;;
@@ -83,7 +87,7 @@ if [ -z "$STAGING" ]; then
 	exit 1
 fi
 
-if [ "$STAGING" == "-h" ]; then
+if [ "$STAGING" == "-h" ] || [ "$STAGING" == "help" ]; then
 	print_help
 	exit 0
 fi
@@ -146,7 +150,6 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	do
 		i=$(($i+1))
 		RES=$(curl -s -u admin:admin http://localhost:${PORT}/index.html)
-		
 		if [[ "$RES" =~ "Do not remove this comment, used for Launchpad integration tests" ]]; then
 			echo "Sling started successfully, process: $PID"
 			break
@@ -160,42 +163,59 @@ fi
 echo "################################################################################"
 echo "                            RUNNING MAVEN BUILD                                 "
 echo "################################################################################"
-for i in `find "${DOWNLOAD}/staging/${STAGING}" -type f | grep '\.\(pom\)$'`
+OIFS=$IFS
+if [ "$ORDER" != ".pom" ]; then
+	export IFS=","
+fi
+for ORDER_ITEM in $ORDER
 do
-	# Parse the info required for build out of the pom
-	sed -e 's/xmlns="http:\/\/maven\.apache\.org\/POM\/4\.0\.0"//g' $i > ${DOWNLOAD}/staging/${STAGING}/pom.xml
-	TAG=`xmllint --xpath '/project/scm/connection/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
-	VERSION=`xmllint --xpath '/project/version/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
-	TAG=${TAG/scm:svn:/} 
-	ARTIFACT_ID=`xmllint --xpath '/project/artifactId/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
-	echo "Running build for $TAG..."
-	mkdir -p ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID
-	echo "Exporting tag $TAG to ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
-	svn export --force $TAG ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID > ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
-	echo "Building tag ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
-	mvn clean install -f ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/pom.xml >> ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
-	rc=$?
-	if [ $rc != 0 ] ; then
-		echo "mvn: BAD!! : Failed to build $ARTIFACT_ID, see ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log"
-		exit 1
-	else 
-		echo "mvn: GOOD : Successfully built $ARTIFACT_ID"
-		if [ "$NO_DEPLOY" -eq "0" ]
-		then 
-			curl -s -u admin:admin -F "action=install" -F "_noredir_=_noredir_" -F \
-				"bundlefile=@${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/target/$ARTIFACT_ID-$VERSION.jar" \
-				-F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
-			sleep 30
-			RES=$(curl -s -u admin:admin http://localhost:${PORT}/system/console/bundles/$ARTIFACT_ID -F action=start)
-			if [[ "$RES" =~ "32" ]]; then
-				echo "bundle: GOOD : Successfully installed/started bundle $ARTIFACT_ID"
-			else
-				echo "bundle: BAD!! : Failed to install/start bundle $ARTIFACT_ID, response $RES"
-				STOP_CODE=1
+	ORDER_ITEM_EXP="\/$ORDER_ITEM\/"
+	for POM in `find "${DOWNLOAD}/staging/${STAGING}" -type f | grep '\.\(pom\)$' | grep $ORDER_ITEM_EXP`
+	do
+		if [ "$ORDER" != ".pom" ]; then
+			echo "${bold}Building $POM from $ORDER_ITEM${normal}"
+		fi
+		# Parse the info required for build out of the pom
+		sed -e 's/xmlns="http:\/\/maven\.apache\.org\/POM\/4\.0\.0"//g' $POM > ${DOWNLOAD}/staging/${STAGING}/pom.xml
+		PACKAGING=`xmllint --xpath '/project/packaging/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
+		TAG=`xmllint --xpath '/project/scm/connection/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
+		VERSION=`xmllint --xpath '/project/version/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
+		TAG=${TAG/scm:svn:/} 
+		ARTIFACT_ID=`xmllint --xpath '/project/artifactId/text()' ${DOWNLOAD}/staging/${STAGING}/pom.xml`
+		echo "Running build for $TAG..."
+		mkdir -p ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID
+		echo "Exporting tag $TAG to ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
+		svn export --force $TAG ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID > ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
+		echo "Building tag ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
+		mvn clean install -f ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/pom.xml >> ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
+		rc=$?
+		if [ $rc != 0 ] ; then
+			echo "mvn: BAD!! : Failed to build $ARTIFACT_ID, see ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log"
+			do_cleanup
+			exit 1
+		else 
+			echo "mvn: GOOD : Successfully built $ARTIFACT_ID"
+			if [ "$NO_DEPLOY" -eq "0" ]; then 
+				if [ "$PACKAGING" = "bundle" ]; then
+					curl -s -u admin:admin -F "action=install" -F "_noredir_=_noredir_" -F \
+						"bundlefile=@${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/target/$ARTIFACT_ID-$VERSION.jar" \
+						-F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
+					sleep 30
+					RES=$(curl -s -u admin:admin http://localhost:${PORT}/system/console/bundles/$ARTIFACT_ID -F action=start)
+					if [[ "$RES" =~ "32" ]]; then
+						echo "bundle: GOOD : Successfully installed/started bundle $ARTIFACT_ID"
+					else
+						echo "bundle: BAD!! : Failed to install/start bundle $ARTIFACT_ID, response $RES"
+						STOP_CODE=1
+					fi
+				else
+					echo "Project $ARTIFACT_ID has packaging $PACKAGING, not installing..."
+				fi
 			fi
 		fi
-	fi
+	done
 done
+IFS=$OIFS
 if [ "$NO_DEPLOY" -eq "0" ]; then 
 	echo "################################################################################"
 	echo "                             CHECK INTEGRATION TESTS                            "

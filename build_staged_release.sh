@@ -169,7 +169,12 @@ if [ "$ORDER" != ".pom" ]; then
 fi
 for ORDER_ITEM in $ORDER
 do
-	ORDER_ITEM_EXP="\/$ORDER_ITEM\/"
+	if [ "$ORDER_ITEM" != ".pom" ]; then
+		ORDER_ITEM_EXP="\/$ORDER_ITEM\/"
+	else	
+		ORDER_ITEM_EXP="$ORDER_ITEM"
+	fi
+	echo "Searching for $ORDER_ITEM_EXP..."
 	for POM in `find "${DOWNLOAD}/staging/${STAGING}" -type f | grep '\.\(pom\)$' | grep $ORDER_ITEM_EXP`
 	do
 		if [ "$ORDER" != ".pom" ]; then

@@ -21,6 +21,7 @@ package org.apache.sling.distribution.serialization.impl.vlt;
 
 
 
+import org.apache.jackrabbit.util.Text;
 import org.apache.jackrabbit.vault.fs.api.ImportMode;
 import org.apache.jackrabbit.vault.fs.api.PathFilterSet;
 import org.apache.jackrabbit.vault.fs.api.WorkspaceFilter;
@@ -81,7 +82,7 @@ public class VltUtils {
         return filterSet;
     }
 
-    public static ExportOptions getExportOptions(WorkspaceFilter filter,
+    public static ExportOptions getExportOptions(WorkspaceFilter filter, String[] packageRoots,
                                                  String packageGroup,
                                                  String packageName,
                                                  String packageVersion) {
@@ -96,9 +97,51 @@ public class VltUtils {
         inf.setProperties(props);
 
         opts.setMetaInf(inf);
-        opts.setRootPath("/");
+
+        String root = getPackageRoot(filter.getFilterSets(), packageRoots);
+        opts.setRootPath(root);
+        opts.setMountPath(root);
 
         return opts;
+    }
+
+
+    /**
+     * Picks a package root that dominates all filter sets. If there is none then "/" is returned.
+     */
+    private static String getPackageRoot(List<PathFilterSet> filterSets, String[] packageRoots) {
+
+        String packageRoot = null;
+
+        if (packageRoots != null && packageRoots.length > 0) {
+            for (String currentRoot : packageRoots) {
+                boolean filtersHaveCommonRoot = true;
+
+
+                for (PathFilterSet filterSet : filterSets) {
+                    String filterSetRoot = filterSet.getRoot();
+
+                    if (!filterSetRoot.startsWith(currentRoot)) {
+                        filtersHaveCommonRoot = false;
+                    }
+                }
+
+                if (filtersHaveCommonRoot) {
+                    packageRoot = currentRoot;
+                    break;
+                }
+            }
+
+        }
+
+
+
+        if (packageRoot == null || !packageRoot.startsWith("/")) {
+            packageRoot = "/";
+        }
+
+        return packageRoot;
+
     }
 
     public static ImportOptions getImportOptions(AccessControlHandling aclHandling, ImportMode importMode) {

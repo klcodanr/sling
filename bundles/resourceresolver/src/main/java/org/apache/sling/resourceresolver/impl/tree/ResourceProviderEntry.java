@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.FastTreeMap;
+import org.apache.sling.api.SlingException;
 import org.apache.sling.api.resource.ModifyingResourceProvider;
 import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
@@ -378,12 +379,14 @@ public class ResourceProviderEntry implements Comparable<ResourceProviderEntry> 
                     }
                 }
             }
-            logger.debug("Resource null {} ", fullPath);
-            return null;
-        } catch (final Exception ex) {
-            logger.debug("Failed! ", ex);
-            return null;
+        } catch ( final SlingException se ) {
+            // we rethrow the SlingException (see SLING-4644)
+            throw se;
+        } catch (final Exception ignore) {
+            logger.warn("Unexpected exception while trying to get resource for " + fullPath, ignore);
         }
+        logger.debug("Resource null {} ", fullPath);
+        return null;
     }
 
     public Resource getResourceFromProviders(final ResourceResolverContext ctx,
@@ -468,10 +471,10 @@ public class ResourceProviderEntry implements Comparable<ResourceProviderEntry> 
         for (ProviderHandler currentProviderHandler : viableHandlers) {
             if (currentProviderHandler.canDelete(ctx, resource)) {
                 final ModifyingResourceProvider mrp = (ModifyingResourceProvider) currentProviderHandler.getResourceProvider(ctx);
-                if ( mrp.getResource(resourceResolver, fullPath) != null ) {
+                if ( viableHandlers.size() == 1 || mrp.getResource(resourceResolver, fullPath) != null ) {
                     mrp.delete(resourceResolver, fullPath);
+                    anyProviderAttempted = true;
                 }
-                anyProviderAttempted = true;
             }
         }
 

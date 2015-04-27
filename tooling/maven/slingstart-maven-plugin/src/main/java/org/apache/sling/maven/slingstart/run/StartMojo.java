@@ -66,7 +66,7 @@ public class StartMojo extends AbstractMojo {
      * Set this to "true" to skip starting the launchpad
      *
      */
-    @Parameter(property = "launchpad.skip", defaultValue = "false")
+    @Parameter(property = "maven.test.skip", defaultValue = "false")
     protected boolean skipLaunchpad;
 
     /**
@@ -340,6 +340,10 @@ public class StartMojo extends AbstractMojo {
     throws MojoExecutionException {
         if ( launchpadConfiguration.getPort() == null ) {
             launchpadConfiguration.setPort(String.valueOf(PortHelper.getNextAvailablePort()));
+        }
+
+        if ( launchpadConfiguration.getControlPort() == null ) {
+            launchpadConfiguration.setControlPort(String.valueOf(PortHelper.getNextAvailablePort()));
         }
 
         // set the id of the launchpad

@@ -100,6 +100,9 @@ public class ReverseDistributionAgentFactory extends AbstractDistributionAgentFa
     @Property(boolValue = true, label = "Queue Processing Enabled", description = "Whether or not the distribution agent should process packages in the queues.")
     public static final String QUEUE_PROCESSING_ENABLED = "queue.processing.enabled";
 
+    @Property(cardinality = 100, label = "Passive queues", description = "List of queues that should be disabled." +
+            "These queues will gather all the packages until they are removed explicitly.")
+    public static final String PASSIVE_QUEUES = "passiveQueues";
 
     /**
      * endpoints property
@@ -110,7 +113,7 @@ public class ReverseDistributionAgentFactory extends AbstractDistributionAgentFa
     /**
      * no. of items to poll property
      */
-    @Property(intValue = 10, label = "Pull Items", description = "Number of subsequent pull requests to make.")
+    @Property(intValue = 100, label = "Pull Items", description = "Number of subsequent pull requests to make.")
     public static final String PULL_ITEMS = "pull.items";
 
 
@@ -175,16 +178,19 @@ public class ReverseDistributionAgentFactory extends AbstractDistributionAgentFa
         String serviceName = PropertiesUtil.toString(config.get(SERVICE_NAME), null);
         boolean queueProcessingEnabled = PropertiesUtil.toBoolean(config.get(QUEUE_PROCESSING_ENABLED), true);
 
+        String[] passiveQueues = PropertiesUtil.toStringArray(config.get(PASSIVE_QUEUES), new String[0]);
+        passiveQueues = SettingsUtils.removeEmptyEntries(passiveQueues);
+
 
         String[] exporterEndpoints = PropertiesUtil.toStringArray(config.get(EXPORTER_ENDPOINTS), new String[0]);
         exporterEndpoints = SettingsUtils.removeEmptyEntries(exporterEndpoints);
 
 
-        int pollItems = PropertiesUtil.toInteger(config.get(PULL_ITEMS), Integer.MAX_VALUE);
+        int pullItems = PropertiesUtil.toInteger(config.get(PULL_ITEMS), Integer.MAX_VALUE);
 
 
         DistributionPackageExporter packageExporter = new RemoteDistributionPackageExporter(distributionLog, packageBuilder, transportSecretProvider, exporterEndpoints,
-                TransportEndpointStrategyType.All, pollItems);
+                TransportEndpointStrategyType.All, pullItems);
         DistributionPackageImporter packageImporter = new LocalDistributionPackageImporter(packageBuilder);
         DistributionQueueProvider queueProvider =  new JobHandlingDistributionQueueProvider(agentName, jobManager, context);
 
@@ -192,8 +198,8 @@ public class ReverseDistributionAgentFactory extends AbstractDistributionAgentFa
         DistributionRequestType[] allowedRequests = new DistributionRequestType[] { DistributionRequestType.PULL };
 
 
-        return new SimpleDistributionAgent(agentName, queueProcessingEnabled, serviceName,
-                packageImporter, packageExporter, requestAuthorizationStrategy,
+        return new SimpleDistributionAgent(agentName, queueProcessingEnabled, passiveQueues,
+                serviceName, packageImporter, packageExporter, requestAuthorizationStrategy,
                 queueProvider, dispatchingStrategy, distributionEventFactory, resourceResolverFactory, distributionLog, allowedRequests, null);
 
 

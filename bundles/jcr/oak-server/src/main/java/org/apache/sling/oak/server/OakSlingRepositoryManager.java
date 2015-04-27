@@ -49,10 +49,8 @@ import org.apache.jackrabbit.oak.api.ContentRepository;
 import org.apache.jackrabbit.oak.osgi.OsgiWhiteboard;
 import org.apache.jackrabbit.oak.plugins.commit.ConflictValidatorProvider;
 import org.apache.jackrabbit.oak.plugins.commit.JcrConflictHandler;
-import org.apache.jackrabbit.oak.plugins.index.aggregate.AggregateIndexProvider;
 import org.apache.jackrabbit.oak.plugins.index.aggregate.NodeAggregator;
 import org.apache.jackrabbit.oak.plugins.index.aggregate.SimpleNodeAggregator;
-import org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProvider;
 import org.apache.jackrabbit.oak.plugins.index.lucene.util.LuceneIndexHelper;
 import org.apache.jackrabbit.oak.plugins.name.NameValidatorProvider;
 import org.apache.jackrabbit.oak.plugins.name.NamespaceEditorProvider;
@@ -226,7 +224,7 @@ public class OakSlingRepositoryManager extends AbstractSlingRepositoryManager {
         .with(new InitialContent())
         .with(new ExtraSlingContent())
 
-        .with(JcrConflictHandler.JCR_CONFLICT_HANDLER)
+        .with(JcrConflictHandler.createJcrConflictHandler())
         .with(new EditorHook(new VersionEditorProvider()))
 
         .with(securityProvider)

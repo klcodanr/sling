@@ -366,7 +366,8 @@ public class HeartbeatHandler implements Runnable, StartupListener {
                 String currentTimeMillisStr = String.format("%0"
                         + maxLongLength + "d", System.currentTimeMillis());
 
-                String prefix = "0";
+                final boolean shouldInvertRepositoryDescriptor = config.shouldInvertRepositoryDescriptor();
+                String prefix = (shouldInvertRepositoryDescriptor ? "1" : "0");
 
                 String leaderElectionRepositoryDescriptor = config.getLeaderElectionRepositoryDescriptor();
                 if (leaderElectionRepositoryDescriptor!=null && leaderElectionRepositoryDescriptor.length()!=0) {
@@ -377,13 +378,22 @@ public class HeartbeatHandler implements Runnable, StartupListener {
                     if ( session != null ) {
                         String value = session.getRepository()
                                 .getDescriptor(leaderElectionRepositoryDescriptor);
-                        if (value != null && value.equalsIgnoreCase("true")) {
-                            prefix = "1";
+                        if (value != null) {
+                            if (value.equalsIgnoreCase("true")) {
+                                if (!shouldInvertRepositoryDescriptor) {
+                                    prefix = "1";
+                                } else {
+                                    prefix = "0";
+                                }
+                            }
                         }
                     }
                 }
-                resourceMap.put("leaderElectionId", prefix + "_"
-                        + currentTimeMillisStr + "_" + slingId);
+                final String newLeaderElectionId = prefix + "_"
+                        + currentTimeMillisStr + "_" + slingId;
+                resourceMap.put("leaderElectionId", newLeaderElectionId);
+                resourceMap.put("leaderElectionIdCreatedAt", new Date());
+                logger.debug("issueClusterLocalHeartbeat: set leaderElectionId to "+newLeaderElectionId);
                 resetLeaderElectionId = false;
             }
             resourceResolver.commit();
@@ -493,10 +503,46 @@ public class HeartbeatHandler implements Runnable, StartupListener {
         // the currently live instances.
 
         // initiate a new voting
+        doStartNewVoting(resourceResolver, liveInstances);
+    }
+
+    private void doStartNewVoting(final ResourceResolver resourceResolver,
+            final Set<String> liveInstances) throws PersistenceException {
         String votingId = nextVotingId;
         nextVotingId = UUID.randomUUID().toString();
 
         VotingView.newVoting(resourceResolver, config, votingId, slingId, liveInstances);
+    }
+
+    /**
+     * Management function to trigger the otherwise algorithm-dependent
+     * start of a new voting.
+     * This can make sense when explicitly trying to force a leader
+     * change (which is otherwise not allowed by the discovery API)
+     */
+    public void startNewVoting() {
+        logger.info("startNewVoting: explicitly starting new voting...");
+        ResourceResolver resourceResolver = null;
+        try {
+            resourceResolver = getResourceResolver();
+            final Resource clusterNodesRes = ResourceHelper.getOrCreateResource(
+                    resourceResolver, config.getClusterInstancesPath());
+            final Set<String> liveInstances = ViewHelper.determineLiveInstances(
+                    clusterNodesRes, config);
+            doStartNewVoting(resourceResolver, liveInstances);
+            logger.info("startNewVoting: explicit new voting was started.");
+        } catch (LoginException e) {
+            logger.error("startNewVoting: could not log in administratively: " + e,
+                    e);
+        } catch (PersistenceException e) {
+            logger.error(
+                    "startNewVoting: encountered a persistence exception during view check: "
+                            + e, e);
+        } finally {
+            if (resourceResolver != null) {
+                resourceResolver.close();
+            }
+        }
     }
 
 }

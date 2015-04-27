@@ -64,8 +64,11 @@
                         <fileset>
                             <directory>${basedir}</directory>
                             <includes>
-                                <include>sling</include>
+                                <include>derby.log</include>
                             </includes>
+                        </fileset>
+                        <fileset>
+                            <directory>sling</directory>
                         </fileset>
                     </filesets>
                 </configuration>
@@ -184,6 +187,7 @@
         <module>bundles/extensions/healthcheck</module>
         <module>bundles/resourceaccesssecurity/core</module>
         <module>bundles/resourceaccesssecurity/it</module>
+        <module>bundles/extensions/validation</module>
         <module>bundles/extensions/models/api</module>
         <module>bundles/extensions/models/impl</module>
         <module>bundles/extensions/models/integration-tests</module>

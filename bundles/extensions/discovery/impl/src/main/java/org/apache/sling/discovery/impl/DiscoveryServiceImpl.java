@@ -24,8 +24,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -61,7 +63,9 @@ import org.apache.sling.discovery.impl.topology.TopologyViewImpl;
 import org.apache.sling.discovery.impl.topology.announcement.AnnouncementRegistry;
 import org.apache.sling.discovery.impl.topology.connector.ConnectorRegistry;
 import org.apache.sling.settings.SlingSettingsService;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
+import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,14 +131,41 @@ public class DiscoveryServiceImpl implements DiscoveryService {
     /** the old view previously valid and sent to the TopologyEventListeners **/
     private TopologyViewImpl oldView;
 
-    /** whether or not there is a delayed event sending pending **/
-    private boolean delayedEventPending = false;
+    /** 
+     * whether or not there is a delayed event sending pending.
+     * Marked volatile to allow getTopology() to read this without need for
+     * synchronized(lock) (which would be deadlock-prone). (introduced with SLING-4638).
+     **/
+    private volatile boolean delayedEventPending = false;
 
+    private ServiceRegistration mbeanRegistration;
+
+    protected void registerMBean(BundleContext bundleContext) {
+        if (this.mbeanRegistration!=null) {
+            try{
+                if ( this.mbeanRegistration != null ) {
+                    this.mbeanRegistration.unregister();
+                    this.mbeanRegistration = null;
+                }
+            } catch(Exception e) {
+                logger.error("registerMBean: Error on unregister: "+e, e);
+            }
+        }
+        try {
+            final Dictionary<String, String> mbeanProps = new Hashtable<String, String>();
+            mbeanProps.put("jmx.objectname", "org.apache.sling:type=discovery,name=DiscoveryServiceImpl");
+
+            final DiscoveryServiceMBeanImpl mbean = new DiscoveryServiceMBeanImpl(heartbeatHandler);
+            this.mbeanRegistration = bundleContext.registerService(DiscoveryServiceMBeanImpl.class.getName(), mbean, mbeanProps);
+        } catch (Throwable t) {
+            logger.warn("registerMBean: Unable to register DiscoveryServiceImpl MBean", t);
+        }
+    }
     /**
      * Activate this service
      */
     @Activate
-    protected void activate() {
+    protected void activate(final BundleContext bundleContext) {
         logger.debug("DiscoveryServiceImpl activating...");
 
         if (settingsService == null) {
@@ -147,6 +178,7 @@ public class DiscoveryServiceImpl implements DiscoveryService {
         slingId = settingsService.getSlingId();
 
         oldView = (TopologyViewImpl) getTopology();
+        oldView.markOld();
 
         // make sure the first heartbeat is issued as soon as possible - which
         // is right after this service starts. since the two (discoveryservice
@@ -195,6 +227,8 @@ public class DiscoveryServiceImpl implements DiscoveryService {
                 }
             }
         }
+        
+        registerMBean(bundleContext);        
 
         logger.debug("DiscoveryServiceImpl activated.");
     }
@@ -227,6 +261,14 @@ public class DiscoveryServiceImpl implements DiscoveryService {
         synchronized (lock) {
             activated = false;
         }
+        try{
+            if ( this.mbeanRegistration != null ) {
+                this.mbeanRegistration.unregister();
+                this.mbeanRegistration = null;
+            }
+        } catch(Exception e) {
+            logger.error("deactivate: Error on unregister: "+e, e);
+        }
     }
 
     /**
@@ -244,8 +286,15 @@ public class DiscoveryServiceImpl implements DiscoveryService {
             this.eventListeners = currentList
                     .toArray(new TopologyEventListener[currentList.size()]);
             if (activated && !initEventDelayed) {
+                final TopologyViewImpl topology = (TopologyViewImpl) getTopology();
+                if (delayedEventPending) {
+                    // that means that for other TopologyEventListeners that were already bound
+                    // and in general: the topology is currently CHANGING
+                    // so we must reflect this with the isCurrent() flag (SLING-4638)
+                    topology.markOld();
+                }
                 sendTopologyEvent(eventListener, new TopologyEvent(
-                        Type.TOPOLOGY_INIT, null, getTopology()));
+                        Type.TOPOLOGY_INIT, null, topology));
             }
         }
     }
@@ -444,7 +493,10 @@ public class DiscoveryServiceImpl implements DiscoveryService {
                 .listInstances(localClusterView);
         topology.addInstances(attachedInstances);
 
-        // TODO: isCurrent() might be wrong!!!
+        // SLING-4638: set 'current' correctly
+        if (isIsolated(topology) || delayedEventPending) {
+            topology.markOld();
+        }
 
         return topology;
     }
@@ -489,12 +541,15 @@ public class DiscoveryServiceImpl implements DiscoveryService {
         if (initEventDelayed) {
             if (isIsolated(newView)) {
                 // we cannot proceed until we're out of the isolated mode..
-                logger.warn("handlePotentialTopologyChange: still in isolated mode - cannot send TOPOLOGY_INIT yet.");
+                // SLING-4535 : while this has warning character, it happens very frequently,
+                //              eg also when binding a PropertyProvider (so normal processing)
+                //              hence lowering to info for now
+                logger.info("handlePotentialTopologyChange: still in isolated mode - cannot send TOPOLOGY_INIT yet.");
                 return;
             }
             logger.info("handlePotentialTopologyChange: new view is no longer isolated sending delayed TOPOLOGY_INIT now.");
             final TopologyEvent initEvent = new TopologyEvent(Type.TOPOLOGY_INIT, null,
-                    newView);
+                    newView); // SLING-4638: OK: newView is current==true as we're just coming out of initEventDelayed first time.
             for (final TopologyEventListener da : eventListeners) {
                 sendTopologyEvent(da, initEvent);
             }
@@ -705,6 +760,8 @@ public class DiscoveryServiceImpl implements DiscoveryService {
 	            return;
 	        }
 	        logger.error("forcedShutdown: sending TOPOLOGY_CHANGING to all listeners");
+	        // SLING-4638: make sure the oldView is really marked as old:
+	        oldView.markOld();
             for (final TopologyEventListener da : eventListeners) {
                 sendTopologyEvent(da, new TopologyEvent(Type.TOPOLOGY_CHANGING, oldView,
                         null));

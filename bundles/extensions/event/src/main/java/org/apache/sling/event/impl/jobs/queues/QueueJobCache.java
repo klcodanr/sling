@@ -36,6 +36,7 @@ import org.apache.sling.event.impl.jobs.JobImpl;
 import org.apache.sling.event.impl.jobs.JobTopicTraverser;
 import org.apache.sling.event.impl.jobs.Utility;
 import org.apache.sling.event.impl.jobs.config.JobManagerConfiguration;
+import org.apache.sling.event.impl.jobs.stats.StatisticsManager;
 import org.apache.sling.event.jobs.Queue;
 import org.apache.sling.event.jobs.QueueConfiguration;
 import org.apache.sling.event.jobs.QueueConfiguration.Type;
@@ -80,13 +81,15 @@ public class QueueJobCache {
      * @param topics The topics handled by this queue.
      */
     public QueueJobCache(final JobManagerConfiguration configuration,
+            final String queueName,
+            final StatisticsManager statisticsManager,
             final QueueConfiguration.Type queueType,
             final Set<String> topics) {
         this.configuration = configuration;
         this.queueType = queueType;
         this.topics = new ConcurrentSkipListSet<String>(topics);
         this.topicsWithNewJobs.addAll(topics);
-        this.fillCache();
+        this.fillCache(queueName, statisticsManager);
     }
 
     /**
@@ -122,11 +125,11 @@ public class QueueJobCache {
      * Fill the cache.
      * No need to sync as this is called from the constructor.
      */
-    private void fillCache() {
+    private void fillCache(final String queueName, final StatisticsManager statisticsManager) {
         final Set<String> checkingTopics = new HashSet<String>();
         checkingTopics.addAll(this.topics);
         if ( !checkingTopics.isEmpty() ) {
-            this.loadJobs(checkingTopics);
+            this.loadJobs(queueName, checkingTopics, statisticsManager);
         }
     }
 
@@ -137,6 +140,7 @@ public class QueueJobCache {
      * can be called concurrently.
      */
     public JobHandler getNextJob(final JobConsumerManager jobConsumerManager,
+            final StatisticsManager statisticsManager,
             final Queue queue,
             final boolean doFull) {
         JobHandler handler = null;
@@ -156,7 +160,7 @@ public class QueueJobCache {
                             checkingTopics.addAll(this.topics);
                         }
                         if ( !checkingTopics.isEmpty() ) {
-                            this.loadJobs(checkingTopics);
+                            this.loadJobs(queue.getName(), checkingTopics, statisticsManager);
                         }
                     }
 
@@ -167,6 +171,7 @@ public class QueueJobCache {
                         handler = new JobHandler(job, consumer, this.configuration);
                         if ( (consumer != null || (job.isBridgedEvent() && jobConsumerManager.supportsBridgedEvents())) ) {
                             if ( !handler.startProcessing(queue) ) {
+                                statisticsManager.jobDequeued(queue.getName(), handler.getJob().getTopic());
                                 if ( logger.isDebugEnabled() ) {
                                     logger.debug("Discarding removed job {}", Utility.toString(job));
                                 }
@@ -174,6 +179,7 @@ public class QueueJobCache {
                                 retry = true;
                             }
                         } else {
+                            statisticsManager.jobDequeued(queue.getName(), handler.getJob().getTopic());
                             // no consumer on this instance, assign to another instance
                             handler.reassign();
 
@@ -192,7 +198,8 @@ public class QueueJobCache {
      * Load the next N x numberOf(topics) jobs
      * @param checkingTopics The set of topics to check.
      */
-    private void loadJobs( final Set<String> checkingTopics) {
+    private void loadJobs( final String queueName, final Set<String> checkingTopics,
+            final StatisticsManager statisticsManager) {
         logger.debug("Starting jobs loading from {}...", checkingTopics);
 
         final Map<String, List<JobImpl>> topicCache = new HashMap<String, List<JobImpl>>();
@@ -206,7 +213,7 @@ public class QueueJobCache {
 
                     final Resource topicResource = baseResource.getChild(topic.replace('/', '.'));
                     if ( topicResource != null ) {
-                        topicCache.put(topic, loadJobs(topic, topicResource));
+                        topicCache.put(topic, loadJobs(queueName, topic, topicResource, statisticsManager));
                     }
                 }
             }
@@ -252,7 +259,9 @@ public class QueueJobCache {
      * @param topicResource The parent resource of the jobs
      * @return The cache which will be filled with the jobs.
      */
-    private List<JobImpl> loadJobs(final String topic, final Resource topicResource) {
+    private List<JobImpl> loadJobs(final String queueName, final String topic,
+            final Resource topicResource,
+            final StatisticsManager statisticsManager) {
         logger.debug("Loading jobs from topic {}", topic);
         final List<JobImpl> list = new ArrayList<JobImpl>();
 
@@ -264,6 +273,7 @@ public class QueueJobCache {
             public boolean handle(final JobImpl job) {
                 if ( job.getProcessingStarted() == null && !job.hasReadErrors() ) {
                     list.add(job);
+                    statisticsManager.jobQueued(queueName, topic);
                     if ( list.size() == maxPreloadLimit ) {
                         scanTopic.set(true);
                     }
@@ -303,7 +313,7 @@ public class QueueJobCache {
      * Reschedule the job and add it back into the cache.
      * @param handler The job handler
      */
-    public void reschedule(final JobHandler handler) {
+    public void reschedule(final String queueName, final JobHandler handler, final StatisticsManager statisticsManager) {
         synchronized ( this.cache ) {
             if ( handler.reschedule() ) {
                 if ( this.queueType == Type.ORDERED ) {
@@ -311,6 +321,7 @@ public class QueueJobCache {
                 } else {
                     this.cache.add(handler.getJob());
                 }
+                statisticsManager.jobQueued(queueName, handler.getJob().getTopic());
             }
         }
     }

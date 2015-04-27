@@ -40,7 +40,7 @@ public class TopologyViewImpl implements TopologyView {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     /** Whether or not this topology is considered 'current' / ie currently valid **/
-    private boolean current = true;
+    private volatile boolean current = true;
 
     /** the instances that are part of this topology **/
     private final Set<InstanceDescription> instances = new HashSet<InstanceDescription>();
@@ -92,6 +92,10 @@ public class TopologyViewImpl implements TopologyView {
             if (!instance.getClusterView().getId()
                     .equals(matchingInstance.getClusterView().getId())) {
             	logger.debug("compareTopology: cluster view id does not match");
+                return Type.TOPOLOGY_CHANGED;
+            }
+            if (!instance.isLeader()==matchingInstance.isLeader()) {
+                logger.debug("compareTopology: leaders differ");
                 return Type.TOPOLOGY_CHANGED;
             }
             if (!instance.getProperties().equals(

@@ -37,6 +37,7 @@ import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.commons.threads.ThreadPool;
 import org.apache.sling.event.EventUtil;
 import org.apache.sling.event.impl.EventingThreadPool;
+import org.apache.sling.event.impl.jobs.InternalJobState;
 import org.apache.sling.event.impl.jobs.JobHandler;
 import org.apache.sling.event.impl.jobs.JobImpl;
 import org.apache.sling.event.impl.jobs.JobTopicTraverser;
@@ -134,7 +135,7 @@ public class JobQueueImpl
                         final InternalQueueConfiguration config,
                         final QueueServices services,
                         final Set<String> topics) {
-        final QueueJobCache cache = new QueueJobCache(services.configuration, config.getType(), topics);
+        final QueueJobCache cache = new QueueJobCache(services.configuration, name, services.statisticsManager, config.getType(), topics);
         if ( cache.isEmpty() ) {
             return null;
         }
@@ -212,7 +213,8 @@ public class JobQueueImpl
                 boolean started = false;
                 this.lock.writeLock().lock();
                 try {
-                    final JobHandler handler = this.cache.getNextJob(this.services.jobConsumerManager, this, this.doFullCacheSearch.getAndSet(false));
+                    final JobHandler handler = this.cache.getNextJob(this.services.jobConsumerManager,
+                            this.services.statisticsManager, this, this.doFullCacheSearch.getAndSet(false));
                     if ( handler != null ) {
                         started = true;
                         this.threadPool.execute(new Runnable() {
@@ -273,8 +275,13 @@ public class JobQueueImpl
                 handler.started = System.currentTimeMillis();
 
                 if ( handler.getConsumer() != null ) {
+                    this.services.configuration.getAuditLogger().debug("START OK : {}", job.getId());
                     final long queueTime = handler.started - job.getProperty(JobImpl.PROPERTY_JOB_QUEUED, Calendar.class).getTime().getTime();
+                    // update statistics
+                    this.services.statisticsManager.jobStarted(this.queueName, job.getTopic(), queueTime);
+                    // send notification
                     NotificationUtility.sendNotification(this.services.eventAdmin, NotificationConstants.TOPIC_JOB_STARTED, job, queueTime);
+
                     synchronized ( this.processingJobsLists ) {
                         this.processingJobsLists.put(job.getId(), handler);
                     }
@@ -497,14 +504,16 @@ public class JobQueueImpl
      * @param handler The job handler
      */
     private void requeue(final JobHandler handler) {
-        this.cache.reschedule(handler);
+        this.cache.reschedule(this.queueName, handler, this.services.statisticsManager);
         this.startJobs();
     }
 
     private static final class RescheduleInfo {
         public boolean      reschedule = false;
+        // processing time is only set of state is SUCCEEDED
         public long         processingTime;
         public Job.JobState state;
+        public InternalJobState       finalState;
     }
 
     private RescheduleInfo handleReschedule(final JobHandler handler, final Job.JobState resultState) {
@@ -516,7 +525,7 @@ public class JobQueueImpl
                     this.logger.debug("Finished job {}", Utility.toString(handler.getJob()));
                 }
                 info.processingTime = System.currentTimeMillis() - handler.started;
-                NotificationUtility.sendNotification(this.services.eventAdmin, NotificationConstants.TOPIC_JOB_FINISHED, handler.getJob(), info.processingTime);
+                info.finalState = InternalJobState.SUCCEEDED;
                 break;
             case QUEUED : // check if we exceeded the number of retries
                 final int retries = (Integer) handler.getJob().getProperty(Job.PROPERTY_JOB_RETRIES);
@@ -527,21 +536,21 @@ public class JobQueueImpl
                     if ( this.logger.isDebugEnabled() ) {
                         this.logger.debug("Cancelled job {}", Utility.toString(handler.getJob()));
                     }
-                    NotificationUtility.sendNotification(this.services.eventAdmin, NotificationConstants.TOPIC_JOB_CANCELLED, handler.getJob(), null);
+                    info.finalState = InternalJobState.CANCELLED;
                 } else {
                     info.reschedule = true;
                     handler.getJob().retry();
                     if ( this.logger.isDebugEnabled() ) {
                         this.logger.debug("Failed job {}", Utility.toString(handler.getJob()));
                     }
-                    NotificationUtility.sendNotification(this.services.eventAdmin, NotificationConstants.TOPIC_JOB_FAILED, handler.getJob(), null);
+                    info.finalState = InternalJobState.FAILED;
                 }
                 break;
             default : // consumer cancelled the job (STOPPED, GIVEN_UP, ERROR)
                 if ( this.logger.isDebugEnabled() ) {
                     this.logger.debug("Cancelled job {}", Utility.toString(handler.getJob()));
                 }
-                NotificationUtility.sendNotification(this.services.eventAdmin, NotificationConstants.TOPIC_JOB_CANCELLED, handler.getJob(), null);
+                info.finalState = InternalJobState.CANCELLED;
                 break;
         }
 
@@ -557,6 +566,7 @@ public class JobQueueImpl
     private boolean finishedJob(final String jobId,
                                 final Job.JobState resultState,
                                 final boolean isAsync) {
+        this.services.configuration.getAuditLogger().debug("FINISHED {} : {}", resultState, jobId);
         this.logger.debug("Received finish for job {}, resultState={}", jobId, resultState);
 
         // get job handler
@@ -576,7 +586,7 @@ public class JobQueueImpl
             return false;
         }
 
-        // handle the reschedule, a new job might be returned with updated reschedule info!
+        // handle the rescheduling of the job
         final RescheduleInfo rescheduleInfo = this.handleReschedule(handler, resultState);
 
         if ( !rescheduleInfo.reschedule ) {
@@ -586,6 +596,15 @@ public class JobQueueImpl
         } else {
             this.reschedule(handler);
         }
+        // update statistics
+        this.services.statisticsManager.jobEnded(this.queueName,
+                handler.getJob().getTopic(),
+                rescheduleInfo.finalState,
+                rescheduleInfo.processingTime);
+        // send notification
+        NotificationUtility.sendNotification(this.services.eventAdmin,
+                rescheduleInfo.finalState.getTopic(),
+                handler.getJob(), rescheduleInfo.processingTime);
 
         return rescheduleInfo.reschedule;
     }

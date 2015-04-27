@@ -85,6 +85,9 @@ public class JobManagerConfiguration implements TopologyEventListener, Configura
     /** Logger. */
     private final Logger logger = LoggerFactory.getLogger("org.apache.sling.event.impl.jobs");
 
+    /** Audit Logger. */
+    private final Logger auditLogger = LoggerFactory.getLogger("org.apache.sling.event.jobs.audit");
+
     /** Default resource path for jobs. */
     public static final String DEFAULT_REPOSITORY_PATH = "/var/eventing/jobs";
 
@@ -243,16 +246,19 @@ public class JobManagerConfiguration implements TopologyEventListener, Configura
     /**
      * Create a new resource resolver for reading and writing the resource tree.
      * The resolver needs to be closed by the client.
-     * @return A resource resolver
+     * @return A resource resolver or {@code null} if the component is already deactivated.
      * @throws RuntimeException if the resolver can't be created.
      */
     public ResourceResolver createResourceResolver() {
         ResourceResolver resolver = null;
-        try {
-            resolver = this.resourceResolverFactory.getAdministrativeResourceResolver(null);
-        } catch ( final LoginException le) {
-            logger.error("Unable to create new resource resolver: " + le.getMessage(), le);
-            throw new RuntimeException(le);
+        final ResourceResolverFactory factory = this.resourceResolverFactory;
+        if ( factory != null ) {
+            try {
+                resolver = this.resourceResolverFactory.getAdministrativeResourceResolver(null);
+            } catch ( final LoginException le) {
+                logger.error("Unable to create new resource resolver: " + le.getMessage(), le);
+                throw new RuntimeException(le);
+            }
         }
         return resolver;
     }
@@ -601,5 +607,13 @@ public class JobManagerConfiguration implements TopologyEventListener, Configura
         synchronized ( retryList ) {
             return retryList.get(jobId);
         }
+    }
+
+    /**
+     * The audit logger is logging actions for auditing.
+     * @return The logger
+     */
+    public Logger getAuditLogger() {
+        return this.auditLogger;
     }
 }

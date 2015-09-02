@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
+        <version>24</version>
         <relativePath />
     </parent>
 
@@ -32,7 +32,7 @@
     <!-- ======================================================================= -->
     <artifactId>org.apache.sling.xss</artifactId>
     <packaging>bundle</packaging>
-    <version>1.0.3-SNAPSHOT</version>
+    <version>1.0.5-SNAPSHOT</version>
 
     <name>Apache Sling XSS Protection Bundle</name>
     <description>
@@ -45,9 +45,6 @@
         <url>http://svn.apache.org/viewvc/sling/trunk/bundles/extensions/xss</url>
     </scm>
 
-    <properties>
-        <sling.java.version>6</sling.java.version>
-    </properties>
 
     <!-- ======================================================================= -->
     <!-- B U I L D                                                               -->

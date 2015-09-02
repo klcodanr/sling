@@ -23,13 +23,13 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
-        <relativePath/>
+        <version>24</version>
+        <relativePath />
     </parent>
 
     <artifactId>org.apache.sling.event.dea</artifactId>
     <packaging>bundle</packaging>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.3-SNAPSHOT</version>
 
     <name>Apache Sling Distributed Event Admin</name>
     <description>
@@ -41,11 +41,6 @@
         <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/bundles/extensions/dea</developerConnection>
         <url>http://svn.apache.org/viewvc/sling/trunk/bundles/extensions/dea</url>
     </scm>
-
-    <properties>
-        <sling.java.version>6</sling.java.version>
-    </properties>
-
 
     <build>
         <plugins>

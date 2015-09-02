@@ -1000,7 +1000,7 @@ public class SlingServletResolver
             provider,
             createServiceProperties(reference, provider));
 
-        LOGGER.info("Registered {}", provider.toString());
+        LOGGER.debug("Registered {}", provider.toString());
         synchronized (this.servletsByReference) {
             servletsByReference.put(reference, new ServletReg(servlet, reg));
         }
@@ -1274,7 +1274,7 @@ public class SlingServletResolver
                         servlets = locationUtil.getServlets(resourceResolver);
                     }
                     tr(pw);
-                    tdLabel(pw, "&nbsp;");
+                    tdLabel(pw, "Candidates");
                     tdContent(pw);
 
                     if (servlets == null || servlets.isEmpty()) {

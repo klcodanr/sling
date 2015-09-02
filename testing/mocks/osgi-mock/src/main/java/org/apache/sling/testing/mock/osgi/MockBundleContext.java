@@ -18,6 +18,10 @@
  */
 package org.apache.sling.testing.mock.osgi;
 
+import static java.util.Collections.synchronizedList;
+import static java.util.Collections.synchronizedMap;
+import static java.util.Collections.synchronizedSortedSet;
+
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -56,10 +60,10 @@ import com.google.common.collect.ImmutableList;
 class MockBundleContext implements BundleContext {
 
     private final MockBundle bundle;
-    private final SortedSet<MockServiceRegistration> registeredServices = new TreeSet<MockServiceRegistration>();
-    private final Map<ServiceListener, Filter> serviceListeners = new HashMap<ServiceListener, Filter>();
-    private final List<BundleListener> bundleListeners = new ArrayList<BundleListener>();
-    
+    private final SortedSet<MockServiceRegistration> registeredServices = synchronizedSortedSet(new TreeSet<MockServiceRegistration>());
+    private final Map<ServiceListener, Filter> serviceListeners = synchronizedMap(new HashMap<ServiceListener, Filter>());
+    private final List<BundleListener> bundleListeners = synchronizedList(new ArrayList<BundleListener>());
+
     public MockBundleContext() {
         this.bundle = new MockBundle(this);
     }

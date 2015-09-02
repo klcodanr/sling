@@ -59,6 +59,13 @@ public class ConfigDumpServlet extends TestServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         final String configPid = req.getPathInfo().substring(1);
         final Configuration cfg = configAdmin.getConfiguration(configPid);
+
+        if(cfg == null || cfg.getProperties() == null) {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, 
+                    "No config found with PID=" + configPid
+                    + " (the PID is extracted from the path information that follows this servlet's path");
+            return;
+        }
         
         final SortedSet<String> keys = new TreeSet<String>();
         final Enumeration<?> e = cfg.getProperties().keys();

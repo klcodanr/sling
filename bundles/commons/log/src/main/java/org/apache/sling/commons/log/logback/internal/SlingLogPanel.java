@@ -27,8 +27,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.Collection;
 import java.util.Dictionary;
 import java.util.Hashtable;
@@ -62,7 +65,6 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.turbo.TurboFilter;
 import ch.qos.logback.core.Appender;
-import ch.qos.logback.core.CoreConstants;
 import ch.qos.logback.core.FileAppender;
 import ch.qos.logback.core.helpers.Transform;
 import ch.qos.logback.core.status.Status;
@@ -79,6 +81,18 @@ public class SlingLogPanel extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Request param name to control number of lines to include in the log
+     */
+    private static final String PARAM_NUM_OF_LINES = "tail";
+    private static final String PARAM_APPENDER_NAME = "name";
+
+    /**
+     * Let the path end with extension. In that case WebConsole logic would by pass this request's
+     * response completely
+     */
+    private static final String PATH_TAILER = "tailer.txt";
+
     private final CachingDateFormatter SDF = new CachingDateFormatter("yyyy-MM-dd HH:mm:ss");
 
     private static final String[] LEVEL_NAMES = {
@@ -87,7 +101,8 @@ public class SlingLogPanel extends HttpServlet {
             Level.INFO.levelStr,
             Level.DEBUG.levelStr,
             Level.TRACE.levelStr,
-            Level.OFF.levelStr
+            Level.OFF.levelStr,
+            LogConfigManager.LOG_LEVEL_RESET_TO_DEFAULT
     };
 
     private static final String PACKAGE_SEPARATOR = ".";
@@ -116,6 +131,18 @@ public class SlingLogPanel extends HttpServlet {
         final String consoleAppRoot = (String) req.getAttribute("felix.webconsole.appRoot");
 
         final LoggerStateContext ctx = logbackManager.determineLoggerState();
+        if (req.getPathInfo() != null) {
+            if (req.getPathInfo().endsWith(PATH_TAILER)){
+                String appenderName = req.getParameter(PARAM_APPENDER_NAME);
+                if (appenderName == null){
+                    pw.printf("Provide appender name via [%s] request parameter%n", PARAM_APPENDER_NAME);
+                    return;
+                }
+                renderAppenderContent(ctx, pw, appenderName, getNumOfLines(req));
+                return;
+            }
+        }
+
         appendLoggerStatus(pw, ctx);
         appendOsgiConfiguredLoggerData(pw, consoleAppRoot);
         appendOtherLoggerData(pw, ctx);
@@ -144,9 +171,10 @@ public class SlingLogPanel extends HttpServlet {
                 String logger = req.getParameter("logger");
                 String logLevel = req.getParameter("loglevel");
                 String logFile = req.getParameter("logfile");
+                String additive = req.getParameter("logAdditive");
                 String[] loggers = req.getParameterValues("logger");
                 if (null != logger) {
-                    configureLogger(pid, logLevel, loggers, logFile);
+                    configureLogger(pid, logLevel, loggers, logFile, additive);
                 }
             }
         } catch (ConfigurationException e) {
@@ -211,6 +239,7 @@ public class SlingLogPanel extends HttpServlet {
         pw.println("<thead class='ui-widget-header'>");
         pw.println("<tr>");
         pw.println("<th>Log Level</th>");
+        pw.println("<th>Additive</th>");
         pw.println("<th>Log File</th>");
         pw.println("<th>Logger</th>");
         pw.print("<th width=\"20%\">");
@@ -228,9 +257,14 @@ public class SlingLogPanel extends HttpServlet {
             pw.print( XmlUtil.escapeXml(logConfig.getConfigPid()) );
             pw.println("\">");
             pw.print("<td><span class=\"logLevels\" data-currentloglevel=\"");
-            pw.print(logConfig.getLogLevel().levelStr);
+            pw.print(getLevelStr(logConfig));
             pw.print("\">");
-            pw.print(logConfig.getLogLevel().levelStr);
+            pw.print(getLevelStr(logConfig));
+            pw.println("</span></td>");
+            pw.print("<td><span class=\"logAdditive\" data-currentAdditivity=\"");
+            pw.print(Boolean.toString(logConfig.isAdditive()));
+            pw.print("\">");
+            pw.print(Boolean.toString(logConfig.isAdditive()));
             pw.println("</span></td>");
             pw.print("<td><span class=\"logFile\">");
             pw.print( XmlUtil.escapeXml(getPath(logConfig.getLogWriterName(), rootPath, shortenPaths)));
@@ -269,6 +303,7 @@ public class SlingLogPanel extends HttpServlet {
         }
 
         pw.println("\"></span></td>");
+        pw.print("<td><span class=\"logAdditive\" data-currentAdditivity=\"false\"></span></td>");
         pw.print("<td><span id=\"defaultLogfile\" data-defaultlogfile=\"");
         pw.print( XmlUtil.escapeXml(getPath(configManager.getDefaultWriter().getFileName(), rootPath, shortenPaths)));
         pw.println("\" class=\"logFile\"></span></td>");
@@ -279,7 +314,7 @@ public class SlingLogPanel extends HttpServlet {
         pw.println("</div>");
     }
 
-    private void appendOtherLoggerData(final PrintWriter pw, final LoggerStateContext ctx) {
+    private void appendOtherLoggerData(final PrintWriter pw, final LoggerStateContext ctx) throws UnsupportedEncodingException {
         if (ctx.nonOSgiConfiguredLoggers.isEmpty()) {
             return;
         }
@@ -309,7 +344,7 @@ public class SlingLogPanel extends HttpServlet {
             pw.print(Boolean.toString(logger.isAdditive()));
             pw.println("</td>");
             pw.print("<td>");
-            pw.print( XmlUtil.escapeXml(logger.getName()));
+            pw.print(XmlUtil.escapeXml(logger.getName()));
             pw.println("</td>");
 
             pw.println("<td>");
@@ -331,7 +366,7 @@ public class SlingLogPanel extends HttpServlet {
         pw.println("</div>");
     }
 
-    private void addAppenderData(final PrintWriter pw, final String consoleAppRoot, final LoggerStateContext ctx) {
+    private void addAppenderData(final PrintWriter pw, final String consoleAppRoot, final LoggerStateContext ctx) throws UnsupportedEncodingException {
         pw.println("<div class='table'>");
 
         pw.println("<div class='ui-widget-header ui-corner-top buttonGroup'>Appender</div>");
@@ -351,7 +386,11 @@ public class SlingLogPanel extends HttpServlet {
         for (final Appender<ILoggingEvent> appender : ctx.appenders.values()) {
             pw.println("<tr>");
             pw.print("<td>");
-            pw.print(XmlUtil.escapeXml(getName(appender)));
+            if (appender instanceof FileAppender) {
+                pw.print(getLinkedName((FileAppender<ILoggingEvent>) appender));
+            } else {
+                pw.print(XmlUtil.escapeXml(getName(appender)));
+            }
             pw.println("</td>");
             pw.print("<td>");
             pw.print(formatPid(consoleAppRoot, appender, ctx));
@@ -432,7 +471,7 @@ public class SlingLogPanel extends HttpServlet {
             pw.print(statusLevelAsString(s));
             pw.println("</td>");
             pw.print("<td>");
-            pw.print(XmlUtil.escapeXml(abbreviatedOrigin(s)));
+            pw.print(XmlUtil.escapeXml(SlingConfigurationPrinter.abbreviatedOrigin(s)));
             pw.println("</td>");
             pw.print("<td>");
             pw.print(XmlUtil.escapeXml(s.getMessage()));
@@ -581,6 +620,43 @@ public class SlingLogPanel extends HttpServlet {
         return true;
     }
 
+    private void renderAppenderContent(LoggerStateContext ctx, PrintWriter pw, String appenderName, int numOfLines)
+            throws IOException {
+        for (final Appender<ILoggingEvent> appender : ctx.appenders.values()) {
+            if (appender instanceof FileAppender && appenderName.equals(appender.getName())) {
+                final File file = new File(((FileAppender) appender).getFile());
+                if (file.exists()) {
+                    if (numOfLines < 0) {
+                        SlingConfigurationPrinter.includeWholeFile(pw, file);
+                    } else {
+                        new Tailer(pw, numOfLines).tail(file);
+                    }
+                }
+                return;
+            }
+        }
+        pw.printf("No appender with name [%s] found", appenderName);
+    }
+
+    private int getNumOfLines(HttpServletRequest req) {
+        return Util.toInteger(req.getParameter(PARAM_NUM_OF_LINES), logbackManager.getLogConfigManager().getNumOfLines());
+    }
+
+    private String getLinkedName(FileAppender<ILoggingEvent> appender) throws UnsupportedEncodingException {
+        String fileName = appender.getFile();
+        String name = appender.getName();
+        return String.format("File : [<a href=\"%s/%s?%s=%d&%s=%s\">%s</a>] %s",
+                APP_ROOT,
+                PATH_TAILER,
+                PARAM_NUM_OF_LINES,
+                logbackManager.getLogConfigManager().getNumOfLines(),
+                PARAM_APPENDER_NAME,
+                URLEncoder.encode(name, "UTF-8"),
+                XmlUtil.escapeXml(name),
+                XmlUtil.escapeXml(fileName));
+
+    }
+
     /**
      * Configures the logger with the given pid. If the pid is empty a new logger configuration is created.
      *
@@ -588,10 +664,11 @@ public class SlingLogPanel extends HttpServlet {
      * @param logLevel the log level to set
      * @param loggers  list of logger categories to set
      * @param logFile  log file (relative path is ok)
+     * @param additive logger additivity
      * @throws IOException            when an existing configuration couldn't be updated or a configuration couldn't be created.
      * @throws ConfigurationException when mandatory parameters where not specified
      */
-    private void configureLogger(final String pid, final String logLevel, final String[] loggers, final String logFile)
+    private void configureLogger(final String pid, final String logLevel, final String[] loggers, final String logFile, String additive)
             throws IOException, ConfigurationException {
         // try to get the configadmin service reference
         ServiceReference sr = this.bundleContext
@@ -625,6 +702,12 @@ public class SlingLogPanel extends HttpServlet {
                         dict.put(LogConfigManager.LOG_LEVEL, logLevel.toLowerCase());
                         dict.put(LogConfigManager.LOG_LOGGERS, loggers);
                         dict.put(LogConfigManager.LOG_FILE, logFile);
+
+                        if (additive == null){
+                            dict.put(LogConfigManager.LOG_ADDITIV, "false");
+                        } else {
+                            dict.put(LogConfigManager.LOG_ADDITIV, "true");
+                        }
                         config.update(dict);
                     }
                 }
@@ -682,6 +765,13 @@ public class SlingLogPanel extends HttpServlet {
         logbackManager.getLogConfigManager().internalFailure(msg, e);
     }
 
+    private String getLevelStr(LogConfig logConfig) {
+        if (logConfig.isResetToDefault()){
+            return LogConfigManager.LOG_LEVEL_RESET_TO_DEFAULT;
+        }
+        return logConfig.getLogLevel().levelStr;
+    }
+
     private static String getName(TurboFilter tf) {
         if (tf.getName() != null) {
             return String.format("%s (%s)", tf.getName(), tf.getClass().getName());
@@ -701,7 +791,7 @@ public class SlingLogPanel extends HttpServlet {
         }
     }
 
-    private static String getName(Appender<ILoggingEvent> appender) {
+    private static String getName(Appender<ILoggingEvent> appender) throws UnsupportedEncodingException {
         // For normal file appender we also display the name of appender
         if (appender instanceof FileAppender) {
             return String.format("File : [%s] %s", appender.getName(), ((FileAppender) appender).getFile());
@@ -781,20 +871,6 @@ public class SlingLogPanel extends HttpServlet {
                 return "<span class=\"error\">ERROR</span>";
         }
         return null;
-    }
-
-    static String abbreviatedOrigin(Status s) {
-        Object o = s.getOrigin();
-        if (o == null) {
-            return null;
-        }
-        String fqClassName = o.getClass().getName();
-        int lastIndex = fqClassName.lastIndexOf(CoreConstants.DOT);
-        if (lastIndex != -1) {
-            return fqClassName.substring(lastIndex + 1, fqClassName.length());
-        } else {
-            return fqClassName;
-        }
     }
 
     private static void printThrowable(PrintWriter pw, Throwable t) {

@@ -23,8 +23,8 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
-        <relativePath />
+        <version>24</version>
+        <relativePath/>
     </parent>
 
     <artifactId>org.apache.sling.testing.logging-mock</artifactId>
@@ -33,10 +33,6 @@
 
     <name>Apache Sling Testing Mock Log Configuration</name>
     <description>Default simple SLF4J log configuration for Mock libraries.</description>
-
-    <properties>
-        <sling.java.version>6</sling.java.version>
-    </properties>
 
     <scm>
         <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/testing/mocks/logging-mock</connection>

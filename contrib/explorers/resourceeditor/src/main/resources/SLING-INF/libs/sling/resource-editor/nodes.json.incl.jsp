@@ -17,13 +17,13 @@
   under the License.
 --%>
 [
-	<c:forEach var="theResource" items="<%=resource.listChildren()%>" varStatus="status">
-		<c:set var="resourceIsNode" scope="request" value="<%=resource.adaptTo(Node.class) !=null %>"/>
+	<c:forEach var="theResource" items="${sling:listChildren(resource)}" varStatus="status">
+		<c:set var="resourceIsNode" scope="request" value="${sling:adaptTo(resource,'javax.jcr.Node') != null}"/>
 		<%--Hiding the resource provider root. --%>
 		<c:if test="${theResource.path != '/reseditor'}">
 			<% Resource theResource = (Resource) pageContext.getAttribute("theResource");
 			   Node node = theResource.adaptTo(Node.class);
-			   String nodeType = (node !=null) ? node.getPrimaryNodeType().getName() : "";
+			   String nodeType = (node !=null) ? node.getPrimaryNodeType().getName() : "nt:unstructured";
 			   pageContext.setAttribute("nodeType", nodeType);
 			%>
 			{

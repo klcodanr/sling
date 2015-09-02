@@ -214,7 +214,7 @@ public class Instance {
 
     private MyConfig config;
 
-    private EventListener observationListener;
+    private MyEventListener observationListener;
 
     private ObservationManager observationManager;
 
@@ -241,7 +241,11 @@ public class Instance {
 						return;
 					}
 				}
-				runHeartbeatOnce();
+				try{
+				    runHeartbeatOnce();
+				} catch(Exception e) {
+				    logger.error("run: heartbeat for slingId="+slingId+" threw exception: "+e, e);
+				}
 				try {
 					Thread.sleep(intervalInSeconds*1000);
 				} catch (InterruptedException e) {
@@ -257,6 +261,64 @@ public class Instance {
             ResourceResolverFactory resourceResolverFactory, boolean resetRepo)
             throws Exception {
     	this("/var/discovery/impl/", debugName, resourceResolverFactory, resetRepo, 20, 20, 1, UUID.randomUUID().toString(), false);
+    }
+    
+    private class MyEventListener implements EventListener {
+        
+        volatile boolean stopped = false;
+        private final String slingId;
+        
+        public MyEventListener(String slingId) {
+            this.slingId = slingId;
+        }
+        
+        public void stop() {
+            logger.debug("stop: stopping listener for slingId: "+slingId);
+            stopped = true;
+        }
+
+        public void onEvent(EventIterator events) {
+            if (stopped) {
+                logger.info("onEvent: listener: "+slingId+" getting late events even though stopped: "+events.hasNext());
+                return;
+            }
+            try {
+                while (!stopped && events.hasNext()) {
+                    Event event = events.nextEvent();
+                    Properties properties = new Properties();
+                    String topic;
+                    if (event.getType() == Event.NODE_ADDED) {
+                        topic = SlingConstants.TOPIC_RESOURCE_ADDED;
+                    } else if (event.getType() == Event.NODE_MOVED) {
+                        topic = SlingConstants.TOPIC_RESOURCE_CHANGED;
+                    } else if (event.getType() == Event.NODE_REMOVED) {
+                        topic = SlingConstants.TOPIC_RESOURCE_REMOVED;
+                    } else {
+                        topic = SlingConstants.TOPIC_RESOURCE_CHANGED;
+                    }
+                    try {
+                        properties.put("path", event.getPath());
+                        org.osgi.service.event.Event osgiEvent = new org.osgi.service.event.Event(
+                                topic, properties);
+                        logger.info("onEvent: delivering event to listener: "+slingId+", stopped: "+stopped+", event: "+osgiEvent);
+                        votingHandler.handleEvent(osgiEvent);
+                    } catch (RepositoryException e) {
+                        logger.warn("RepositoryException: " + e, e);
+                    }
+                }
+                if (stopped) {
+                    logger.info("onEvent: listener stopped: "+slingId+", pending events: "+events.hasNext());
+                }
+            } catch (Throwable th) {
+                try {
+                    dumpRepo();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                logger.error(
+                        "Throwable occurred in onEvent: " + th, th);
+            }
+        }
     }
 
     private Instance(String discoveryResourcePath, String debugName,
@@ -312,44 +374,15 @@ public class Instance {
         observationManager = session.getWorkspace()
                 .getObservationManager();
 
-        observationListener =
-                new EventListener() {
-
-                    public void onEvent(EventIterator events) {
-                        try {
-                            while (events.hasNext()) {
-                                Event event = events.nextEvent();
-                                Properties properties = new Properties();
-                                String topic;
-                                if (event.getType() == Event.NODE_ADDED) {
-                                    topic = SlingConstants.TOPIC_RESOURCE_ADDED;
-                                } else if (event.getType() == Event.NODE_MOVED) {
-                                    topic = SlingConstants.TOPIC_RESOURCE_CHANGED;
-                                } else if (event.getType() == Event.NODE_REMOVED) {
-                                    topic = SlingConstants.TOPIC_RESOURCE_REMOVED;
-                                } else {
-                                    topic = SlingConstants.TOPIC_RESOURCE_CHANGED;
-                                }
-                                try {
-                                    properties.put("path", event.getPath());
-                                    org.osgi.service.event.Event osgiEvent = new org.osgi.service.event.Event(
-                                            topic, properties);
-                                    votingHandler.handleEvent(osgiEvent);
-                                } catch (RepositoryException e) {
-                                    logger.warn("RepositoryException: " + e, e);
-                                }
-                            }
-                        } catch (Throwable th) {
-                            try {
-                                dumpRepo();
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                            logger.error(
-                                    "Throwable occurred in onEvent: " + th, th);
-                        }
-                    }
-        };
+        if (resetRepo) {
+            //SLING-4587 : do resetRepo before creating the observationListener
+            // otherwise it will get tons of events from the deletion of /var
+            // which the previous test could have left over.
+            // Doing it before addEventListener should prevent that.
+            osgiMock.resetRepo();
+        }
+        
+        observationListener = new MyEventListener(slingId);
         observationManager.addEventListener(
                 observationListener
                 , Event.NODE_ADDED | Event.NODE_REMOVED | Event.NODE_MOVED
@@ -358,7 +391,7 @@ public class Instance {
                 null,
                 null, false);
 
-        osgiMock.activateAll(resetRepo);
+        osgiMock.activateAll();
     }
     
     @Override
@@ -628,6 +661,9 @@ public class Instance {
             observationManager.removeEventListener(observationListener);
     	} else {
     	    logger.warn("stop: could not remove listener for slingId="+slingId+", debugName="+debugName+", observationManager="+observationManager+", observationListener="+observationListener);
+    	}
+    	if (observationListener!=null) {
+    	    observationListener.stop();
     	}
 
         if (resourceResolver != null) {

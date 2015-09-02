@@ -20,12 +20,14 @@ package org.apache.sling.testing.mock.osgi;
 
 import java.io.File;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.cert.X509Certificate;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -45,6 +47,7 @@ public final class MockBundle implements Bundle {
     private final BundleContext bundleContext;
     private Map<String, String> headers = ImmutableMap.<String, String>of();
     private String symbolicName = "mock-bundle";
+    private long lastModified;
 
     /**
      * Constructor
@@ -66,8 +69,10 @@ public final class MockBundle implements Bundle {
 
     @Override
     public URL getEntry(final String name) {
-        // try to load resource from classpath
-        return getClass().getResource(name);
+        
+        String nameToQuery = name.startsWith("/") ? name : "/" + name;
+
+        return getClass().getResource(nameToQuery);
     }
 
     @Override
@@ -106,20 +111,71 @@ public final class MockBundle implements Bundle {
     public void setSymbolicName(String value) {
         this.symbolicName = value;
     }
+
+    @Override
+    public long getLastModified() {
+        return lastModified;
+    }
+    
+    /**
+     * Set the last modified value for the mock bundle 
+     * @param lastModified last modified
+     */
+    public void setLastModified(long lastModified) {
+        this.lastModified = lastModified;
+    }
+    
+    @Override
+    public Enumeration<String> getEntryPaths(final String path) {
+        
+        String queryPath = path.startsWith("/") ? path : "/" + path;
+        
+        URL res = getClass().getResource(queryPath);
+        if ( res == null ) {
+            return null;
+        }
+        
+        Vector<String> matching = new Vector<String>();
+        
+        try {
+            File file = new File(res.toURI());
+            if ( file.isDirectory()) {
+                for ( File entry : file.listFiles() ) {
+                    String name = entry.isDirectory() ? entry.getName() + "/" : entry.getName();
+                    matching.add(relativeWithTrailingSlash(queryPath.substring(1, queryPath.length())) + name);
+                }
+            }
+        } catch (URISyntaxException e) {
+            throw new RuntimeException("Failed opening file from " + res , e);
+        } catch ( RuntimeException e) {
+            throw new RuntimeException("Failed opening file from " + res , e);
+        }
+        
+        if ( matching.isEmpty() ) {
+            return null;
+        }
+        
+        return matching.elements();
+    }
+
+    private String relativeWithTrailingSlash(String queryPath) {
+        
+        // make relative
+        if ( queryPath.startsWith("/")) {
+            queryPath = queryPath.substring(1, queryPath.length());
+        }
+        
+        // remove trailing slash
+        if ( !queryPath.isEmpty() && !queryPath.endsWith("/") ) {
+            queryPath = queryPath +"/";
+        }
+        
+        return queryPath;
+    }
     
     // --- unsupported operations ---
     @Override
     public Enumeration<URL> findEntries(final String path, final String filePattern, final boolean recurse) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Enumeration<String> getEntryPaths(final String path) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long getLastModified() {
         throw new UnsupportedOperationException();
     }
 

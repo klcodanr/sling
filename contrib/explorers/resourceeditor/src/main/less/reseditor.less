@@ -31,6 +31,7 @@
 @import "forms.less";
 @import "buttons.less";
 @import "modals.less";
+@import "glyphicons.less";
  
 
 /* ################################################################# */
@@ -69,16 +70,13 @@ body
 }
 
 .plate-background {
-	background: -moz-linear-gradient(-45deg,  rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.7) 100%); /* FF3.6+ */
-	background: -webkit-gradient(linear, left top, right bottom, color-stop(0%,rgba(0,0,0,0.4)), color-stop(100%,rgba(0,0,0,0.7))); /* Chrome,Safari4+ */
-	background: -webkit-linear-gradient(-45deg,  rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.7) 100%); /* Chrome10+,Safari5.1+ */
-	background: -o-linear-gradient(-45deg,  rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.7) 100%); /* Opera 11.10+ */
-	background: -ms-linear-gradient(-45deg,  rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.7) 100%); /* IE10+ */
-	background: linear-gradient(-45deg,  rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.7) 100%); /* W3C */
+	   /* Fallback for web browsers that doesn't support RGBa */
+    background: rgb(0, 0, 0) transparent;
+    /* RGBa with 0.6 opacity */
+    background: rgba(0, 0, 0, 0.6);
 }
 
 .ie9filter-plate-div {
-	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#a0000000', endColorstr='#c9000000',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
 	height: 100%;
 }
 .plate-box-shadow {
@@ -91,16 +89,23 @@ body
     .rounded(7px);
 }
 
+.full-height {
+	height: 100%;
+}
+
+#iframe_main {
+	padding-bottom: 40px;
+	.rounded;
+}
+
 @dark-gray: #303030;
 
 .plate-text-shadow {
 	text-shadow: 1px 1px 0px @dark-gray, 0px 0px 0px black;
 }
+
 .plate-selected-text-shadow {
 	text-shadow: 1px 1px 0px black, 0px 0px 0px #202020;
-}
-.plate-margin {
-	margin: 15px;
 }
 
 .plate {
@@ -110,9 +115,6 @@ body
 	.plate-text-shadow;
 	
 	overflow: hidden;
-	
-	.plate-margin;
-	
 }
 
 /* .logo has to be defined after .plate to overwrite the font properties */
@@ -120,12 +122,19 @@ body
 	font-family: 'Michroma', sans-serif;
 	font-weight: bold;
 	font-size: 24px;
-	color: #2D373D;
+	color: @brand-primary;
 	text-shadow: 0 2px 2px #dddddd;
 	display: inline;
 	margin: 10px;
 	position: relative;
 	top: 10px;
+}
+
+#main-row {
+	margin-top: 15px;	
+}
+#content-tabs {
+	margin-left: 10px;
 }
 
 .edition {
@@ -134,15 +143,17 @@ body
 	margin-left: 4px;
 }
 
-.logout a {
+#login .logout a {
 	.rounded;
-	border: 1px solid #2D373D;
-	color: #2D373D;
+	border: 1px solid @brand-primary;
+	color: @brand-primary;
 	text-shadow: 0 1px 1px #EEE;
 	font-size: 15px;
 	margin: 10px 10px 0 0;
-	padding: 0 10px;
 	box-shadow: inset 0px 0px 1px black, 1px 1px 0px white;
+}
+#login .logout a:hover {
+	background-color: @textColor;
 }
 
 #login_error {
@@ -163,7 +174,7 @@ body
     width: 100%;
 }
 #inner_content_margin {
-    margin: 10px;
+    margin: 0 10px;
 }
 
 #footer {
@@ -171,27 +182,11 @@ body
     padding: 5px;
 }
 
-
-fieldset
-{
-	border: none;
-	margin-top: 5px;
-	padding: 0;
-}
 .proplabel
 {
-	width: 25%;
-	float: left;
-	display: inline;
 	line-height: 24px;
-	color: #C0C0C0;
+	color: @textColor;
 	font-weight: normal;
-}
-.propinput
-{
-	float: left;
-	display: inline;
-	width: 65%;
 }
 .propinputmultival
 {
@@ -202,7 +197,6 @@ fieldset
 .propmultival_fieldset
 {
 	float: left;
-	width: 65%;
 	margin: 0 5px 0 0
 }
 
@@ -247,6 +241,23 @@ fieldset
 	background-image: url(../../img/remove.png);
 }
 
+.property-icon {
+  	margin-top: 5px;
+}
+
+.icon {
+	cursor: pointer;
+	border: 1px solid transparent; 
+	padding: 3px;
+	-moz-border-radius: 3px;
+    border-radius: 3px;
+}
+
+.property-icon:hover {
+	border: 1px solid black;
+	background-color: @selectedBackground;
+}
+
 .jstree-default .jstree-icon.add-icon{
 	background-image: url(../../img/add.png);
     margin-right: 3px;
@@ -282,7 +293,7 @@ fieldset
 
 #tree .jstree-clicked 
 {
-	background:#303030; 
+	background: @selectedBackground; 
 	border:1px solid black; 
 	padding:0px 1px;
     -moz-border-radius: 5px;
@@ -349,4 +360,17 @@ input.jstree-rename-input{
 }
 #addNodeDialog .form-group label a{
 	font-weight: normal;
+}
+
+.propertyTypeMenu {
+	text-shadow: none;
+}
+
+#node-content .ie9filter-plate-div {
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+#properties-info-icon {
+	margin-top: 5px;
 }

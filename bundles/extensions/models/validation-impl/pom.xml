@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
+        <version>24</version>
         <relativePath/>
     </parent>
     <groupId>org.apache.sling</groupId>
@@ -31,9 +31,7 @@
     <version>1.0.0-SNAPSHOT</version>
     <name>Apache Sling Models Validation Implementation</name>
     <description>Validation Implementation which leverages Sling Validation</description>
-    <properties>
-        <sling.java.version>6</sling.java.version>
-    </properties>
+
     <scm>
         <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/bundles/extensions/models/validation-impl</connection>
         <developerConnection> scm:svn:https://svn.apache.org/repos/asf/sling/trunk/bundles/extensions/models/validation-impl</developerConnection>
@@ -56,7 +54,7 @@
         <dependency>
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.models.api</artifactId>
-            <version>1.1.1-SNAPSHOT</version>
+            <version>1.2.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

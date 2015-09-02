@@ -23,8 +23,8 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
-        <relativePath />
+        <version>24</version>
+        <relativePath/>
     </parent>
 
     <artifactId>org.apache.sling.scripting.sightly.testing</artifactId>
@@ -149,7 +149,7 @@
             <plugin>
                 <groupId>org.apache.sling</groupId>
                 <artifactId>slingstart-maven-plugin</artifactId>
-                <version>1.1.1-SNAPSHOT</version>
+                <version>1.2.0</version>
                 <extensions>true</extensions>
                 <executions>
                     <execution>
@@ -165,7 +165,7 @@
                         <server>
                             <port>${http.port}</port>
                             <controlPort>${sling.control.port}</controlPort>
-                            <runmode>jackrabbit</runmode>
+                            <runmode>oak</runmode>
                             <contextPath>${http.base.path}</contextPath>
                             <debug>${debug.options}</debug>
                         </server>

@@ -91,7 +91,7 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        final Model model = ProjectHelper.getEffectiveModel(this.project);
+        final Model model = ProjectHelper.getEffectiveModel(this.project, getResolverOptions());
 
         this.prepareGlobal(model);
         this.prepareStandaloneApp(model);
@@ -200,7 +200,7 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
     throws MojoExecutionException{
         for(final ArtifactGroup group : runMode.getArtifactGroups()) {
             for(final org.apache.sling.provisioning.model.Artifact a : group) {
-                final Artifact artifact = ModelUtils.getArtifact(this.project, this.mavenSession, this.artifactHandlerManager, this.resolver, 
+                final Artifact artifact = ModelUtils.getArtifact(this.project, this.mavenSession, this.artifactHandlerManager, this.resolver,
                         a.getGroupId(), a.getArtifactId(), a.getVersion(), a.getType(), a.getClassifier());
                 final File artifactFile = artifact.getFile();
                 contentsMap.put(getPathForArtifact(group.getStartLevel(), artifactFile.getName(), runMode, isBoot), artifactFile);
@@ -452,7 +452,7 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
                 mainName,
                 alias);
     }
-    
+
     /**
      * Replace \${var} with ${var}
      * @param text String with escaped variables
@@ -464,5 +464,5 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
         }
         return text.replaceAll("\\\\\\$", "\\$");
     }
-    
+
 }

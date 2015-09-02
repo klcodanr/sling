@@ -25,8 +25,8 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
-        <relativePath />
+        <version>24</version>
+        <relativePath/>
     </parent>
 
     <!-- ======================================================================= -->
@@ -51,7 +51,6 @@
 
     <properties>
         <antlr.version>4.1</antlr.version>
-        <sling.java.version>6</sling.java.version>
     </properties>
 
     <!-- ======================================================================= -->
@@ -114,6 +113,14 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <stylesheet>maven</stylesheet>
+                    <excludePackageNames>*.impl:*.internal:${site.javadoc.exclude}</excludePackageNames>
+                </configuration>
             </plugin>
         </plugins>
     </build>

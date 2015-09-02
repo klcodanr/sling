@@ -46,7 +46,12 @@ public class JcrResourceBundle extends ResourceBundle {
 
     private static final Logger log = LoggerFactory.getLogger(JcrResourceBundle.class);
 
+    /** default primary type (=resource type) for message entry dictionaries */
+    static final String RT_MESSAGE_ENTRY = "sling:MessageEntry";
+    
     static final String MIXIN_MESSAGE = "sling:Message";
+
+    static final String MIXIN_LANGUAGE = "mix:language";
 
     static final String PROP_KEY = "sling:key";
 
@@ -64,16 +69,19 @@ public class JcrResourceBundle extends ResourceBundle {
 
     private final Locale locale;
 
+    private final String baseName;
+
     private final Set<String> languageRoots = new HashSet<String>();
 
     JcrResourceBundle(Locale locale, String baseName,
             ResourceResolver resourceResolver) {
         this.locale = locale;
+        this.baseName = baseName;
 
         log.info("Finding all dictionaries for '{}' (basename: {}) ...", locale, baseName == null ? "<none>" : baseName);
 
         long start = System.currentTimeMillis();
-        refreshSession(resourceResolver);
+        resourceResolver.refresh();
         Set<String> roots = loadPotentialLanguageRoots(resourceResolver, locale, baseName);
         this.resources = loadFully(resourceResolver, roots, this.languageRoots);
 
@@ -86,10 +94,6 @@ public class JcrResourceBundle extends ResourceBundle {
         }
     }
 
-    static void refreshSession(final ResourceResolver resolver) {
-        resolver.refresh();
-    }
-
     protected Set<String> getLanguageRootPaths() {
         return languageRoots;
     }
@@ -98,10 +102,18 @@ public class JcrResourceBundle extends ResourceBundle {
     protected void setParent(ResourceBundle parent) {
         super.setParent(parent);
     }
+    
+    public ResourceBundle getParent() {
+        return parent;
+    }
 
     @Override
     public Locale getLocale() {
         return locale;
+    }
+
+    public String getBaseName() {
+        return baseName;
     }
 
     /**
@@ -127,6 +139,9 @@ public class JcrResourceBundle extends ResourceBundle {
 
     @Override
     protected Object handleGetObject(String key) {
+        if (log.isDebugEnabled()) {
+            log.debug("Requesting key '{}' from resource bundle (baseName '{}', locale '{}')", new Object[] {key, baseName, locale});
+        }
         return resources.get(key);
     }
 
@@ -336,5 +351,11 @@ public class JcrResourceBundle extends ResourceBundle {
     // Would be nice if Locale.toString() output RFC 4646, but it doesn't
     private static String toRFC4646String(Locale locale) {
         return locale.toString().replace('_', '-');
+    }
+
+    @Override
+    public String toString() {
+        return "JcrResourceBundle [locale=" + locale + ", baseName=" + baseName + ", languageRoots=" + languageRoots
+                + ", parent=" + parent + "]";
     }
 }

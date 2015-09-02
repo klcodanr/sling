@@ -25,14 +25,14 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
+        <version>24</version>
     </parent>
 
     <!-- ======================================================================= -->
     <!-- P R O J E C T                                                           -->
     <!-- ======================================================================= -->
     <artifactId>org.apache.sling.distribution.core</artifactId>
-    <version>0.1.5-SNAPSHOT</version>
+    <version>0.1.7-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
     <name>Apache Sling Distribution Core</name>

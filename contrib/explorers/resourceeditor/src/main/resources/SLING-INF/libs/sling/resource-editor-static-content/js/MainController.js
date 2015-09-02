@@ -44,6 +44,10 @@ org.apache.sling.reseditor.MainController = (function() {
 					$('#alertMsg #Message').remove();
 				});
 			})
+			var hasError = typeof thisMainController.settings.errorMessage != "undefined" && thisMainController.settings.errorMessage != "" && thisMainController.settings.errorMessage != null;
+			if (hasError){
+				thisMainController.displayAlertHtml("Status "+thisMainController.settings.errorStatus+". "+thisMainController.settings.errorMessage);
+			}
 		});
 	};
 
@@ -151,14 +155,16 @@ org.apache.sling.reseditor.MainController = (function() {
 		var login_height = $("#login").outerHeight(true);
 		var header_height = $("#header").outerHeight(true);
 		var alert_height = $("#alerts").outerHeight(true);
+		var content_tab_height = $("#content-tabs").outerHeight(true);
 		var footer_height = $("#footer").outerHeight(true);
 		var sidebar_margin = $("#sidebar").outerHeight(true)-$("#sidebar").outerHeight(false);
-		var usable_height = $(window).height() - login_height - header_height - alert_height - sidebar_margin - 1;
+		var mainrow_margin = $("#main-row").outerHeight(true)-$("#main-row").outerHeight(false);
+		var usable_height = $(window).height() - login_height - header_height - alert_height - sidebar_margin - mainrow_margin - 15;
 		
 	// activate again if the footer is needed	
 //	 	var usable_height = $(window).height() - header_height - footer_height - sidebar_margin - 1;
 		$("#sidebar").height( usable_height );
-		$("#outer_content").height( usable_height );
+		$("#outer_content").height( usable_height-content_tab_height );
 	}
 
 	MainController.prototype.displayAlert = function(error, resourcePath){
@@ -167,12 +173,17 @@ org.apache.sling.reseditor.MainController = (function() {
 		var encodedTitle = this.encodeToHTML(errorJson.title);
 		var encodedMsg = this.encodeToHTML(errorJson["status.message"]);
 		var errorMsg = encodedTitle+" ("+"Status "+errorJson["status.code"]+") "+encodedMsg;
-		$('#alertMsg').append($("<div id='Message'>").append((resourcePath) ? "'"+resourcePath+"': "+errorMsg : errorMsg));
+		this.displayAlertHtml((resourcePath) ? "'"+resourcePath+"': "+errorMsg : errorMsg);
+	}
+
+	MainController.prototype.displayAlertHtml = function(html){
+		var thisMainController = this;
+		$('#alertMsg').append($("<div id='Message'>").append(html));
 		$("#alert").slideDown(function() {
 			thisMainController.adjust_height();
 		});
+		
 	}
-
 
 	MainController.prototype.getNTFromLi = function(li){
 		var nt_name = $(li).children("a").find("span span.node-type").text();

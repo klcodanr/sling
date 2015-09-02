@@ -33,10 +33,13 @@ import java.io.InputStream;
 
 public interface ContentAwareMimeTypeService extends MimeTypeService {
     /**
-     * @param filename used if <code>content</code> is <code>null</code> or if
+     * @param filename Used if <code>content</code> is <code>null</code> or if
      *                 this service does not support content-based detection
-     * @param content  optional stream that points to the content to analyze
+     * @param contentStream  Optional stream that points to the content to analyze,
+     *                 must support mark/reset.
+     * @throws IllegalArgumentException if contentStream does not support mark/reset
+     * @throws IOException if there's a problem reading the contentStream                  
      * @return the mime type
      */
-    String getMimeType(String filename, InputStream content) throws IOException;
+    String getMimeType(String filename, InputStream contentStream) throws IOException, IllegalArgumentException;
 }

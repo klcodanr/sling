@@ -31,9 +31,9 @@ import org.apache.sling.servlets.post.AbstractPostOperation;
 import org.apache.sling.servlets.post.Modification;
 import org.apache.sling.servlets.post.PostOperation;
 import org.apache.sling.servlets.post.PostResponse;
-import org.apache.sling.validation.api.ValidationModel;
-import org.apache.sling.validation.api.ValidationResult;
-import org.apache.sling.validation.api.ValidationService;
+import org.apache.sling.validation.ValidationResult;
+import org.apache.sling.validation.ValidationService;
+import org.apache.sling.validation.model.ValidationModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +64,7 @@ public class ValidationPostOperation extends AbstractPostOperation {
             }
             if (resourceType != null && !"".equals(resourceType)) {
                 String resourcePath = request.getRequestPathInfo().getResourcePath();
-                ValidationModel vm = validationService.getValidationModel(resourceType, resourcePath);
+                ValidationModel vm = validationService.getValidationModel(resourceType, resourcePath, false);
                 if (vm != null) {
                     ValidationResult vr = validationService.validate(requestParameters, vm);
                     vpr.setValidationResult(vr);

@@ -22,14 +22,15 @@ import java.util.Date;
 
 import javax.annotation.Nonnull;
 
+import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
-import org.apache.sling.validation.api.Validator;
-import org.apache.sling.validation.api.exceptions.SlingValidationException;
+import org.apache.sling.validation.Validator;
+import org.apache.sling.validation.exceptions.SlingValidationException;
 
 public class DateValidator implements Validator<Date> {
 
     @Override
-    public String validate(@Nonnull Date data, @Nonnull ValueMap valueMap, @Nonnull ValueMap arguments) throws SlingValidationException {
+    public String validate(@Nonnull Date data, @Nonnull ValueMap valueMap, Resource resource, @Nonnull ValueMap arguments) throws SlingValidationException {
         return null;
     }
 

@@ -21,8 +21,8 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
-        <relativePath />
+        <version>24</version>
+        <relativePath/>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -38,10 +38,6 @@
         <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/bundles/scripting/sightly/repl</developerConnection>
         <url>http://svn.apache.org/viewvc/sling/trunk/bundles/scripting/sightly/repl</url>
     </scm>
-
-    <properties>
-        <sling.java.version>6</sling.java.version>
-    </properties>
 
     <build>
         <pluginManagement>

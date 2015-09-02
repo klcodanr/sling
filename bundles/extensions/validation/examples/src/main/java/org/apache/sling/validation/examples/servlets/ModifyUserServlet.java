@@ -34,9 +34,9 @@ import org.apache.sling.api.servlets.SlingAllMethodsServlet;
 import org.apache.sling.commons.json.JSONArray;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
-import org.apache.sling.validation.api.ValidationModel;
-import org.apache.sling.validation.api.ValidationResult;
-import org.apache.sling.validation.api.ValidationService;
+import org.apache.sling.validation.ValidationResult;
+import org.apache.sling.validation.ValidationService;
+import org.apache.sling.validation.model.ValidationModel;
 
 @SlingServlet(
         resourceTypes = "/apps/validationdemo/components/user",
@@ -58,7 +58,7 @@ public class ModifyUserServlet extends SlingAllMethodsServlet {
         }
         if (resourceType != null && !"".equals(resourceType)) {
             String resourcePath = request.getRequestPathInfo().getResourcePath();
-            ValidationModel vm = validationService.getValidationModel(resourceType, resourcePath);
+            ValidationModel vm = validationService.getValidationModel(resourceType, resourcePath, false);
             if (vm != null) {
                 ValidationResult vr = validationService.validate(requestParameters, vm);
                 if (vr.isValid()) {

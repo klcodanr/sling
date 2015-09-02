@@ -19,11 +19,15 @@ package org.apache.sling.maven.slingstart;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
+import org.apache.sling.provisioning.model.Artifact;
 import org.apache.sling.provisioning.model.Model;
 import org.apache.sling.provisioning.model.ModelUtility;
+import org.apache.sling.provisioning.model.ModelUtility.ResolverOptions;
 import org.apache.sling.provisioning.model.io.ModelReader;
 import org.apache.sling.provisioning.model.io.ModelWriter;
 
@@ -36,8 +40,11 @@ public abstract class ProjectHelper {
     private static final String EFFECTIVE_MODEL_TXT = Model.class.getName() + "/effective.txt";
     private static final String EFFECTIVE_MODEL_CACHE = Model.class.getName() + "/effective.cache";
 
+    private static final String DEPENDENCY_MODEL = Model.class.getName() + "/dependency";
+
     /**
-     *
+     * Store all relevant information about the project for plugins to be
+     * retrieved
      * @param info The project info
      * @throws IOException If writing fails
      */
@@ -51,6 +58,15 @@ public abstract class ProjectHelper {
         final StringWriter w2 = new StringWriter();
         ModelWriter.write(w2, info.model);
         info.project.setContextValue(EFFECTIVE_MODEL_TXT, w2.toString());
+
+        // create map with model dependencies
+        final Map<String, String> map = new HashMap<String, String>();
+        for(final Map.Entry<Artifact, Model> entry : info.includedModels.entrySet()) {
+            final StringWriter w3 = new StringWriter();
+            ModelWriter.write(w3, entry.getValue());
+            map.put(entry.getKey().toMvnUrl(), w3.toString());
+        }
+        info.project.setContextValue(DEPENDENCY_MODEL, map);
     }
 
     /**
@@ -59,14 +75,14 @@ public abstract class ProjectHelper {
      * @return The effective model
      * @throws MojoExecutionException If reading fails
      */
-    public static Model getEffectiveModel(final MavenProject project)
+    public static Model getEffectiveModel(final MavenProject project, ResolverOptions resolverOptions)
     throws MojoExecutionException {
         Model result = (Model) project.getContextValue(EFFECTIVE_MODEL_CACHE);
         if ( result == null ) {
             try {
                 final StringReader r = new StringReader((String)project.getContextValue(EFFECTIVE_MODEL_TXT));
                 result = ModelReader.read(r, project.getId());
-                result = ModelUtility.getEffectiveModel(result, null);
+                result = ModelUtility.getEffectiveModel(result, resolverOptions);
                 project.setContextValue(EFFECTIVE_MODEL_CACHE, result);
             } catch ( final IOException ioe) {
                 throw new MojoExecutionException(ioe.getMessage(), ioe);
@@ -94,5 +110,17 @@ public abstract class ProjectHelper {
             }
         }
         return result;
+    }
+
+    /**
+     * Get the dependency model from the project
+     * @param project The maven projet
+     * @return The dependency  model
+     * @throws MojoExecutionException If reading fails
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, String> getDependencyModel(final MavenProject project)
+    throws MojoExecutionException {
+        return (Map<String, String>) project.getContextValue(DEPENDENCY_MODEL);
     }
 }

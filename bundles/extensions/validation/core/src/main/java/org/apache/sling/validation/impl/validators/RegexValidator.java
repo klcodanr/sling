@@ -25,9 +25,10 @@ import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Service;
+import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
-import org.apache.sling.validation.api.Validator;
-import org.apache.sling.validation.api.exceptions.SlingValidationException;
+import org.apache.sling.validation.Validator;
+import org.apache.sling.validation.exceptions.SlingValidationException;
 
 /**
  * Performs regular expressions validation on the supplied data with the help of the {@link Pattern} class. This {@code Validator} expects a
@@ -40,7 +41,7 @@ public class RegexValidator implements Validator<String> {
     public static final String REGEX_PARAM = "regex";
 
     @Override
-    public String validate(@Nonnull String data, @Nonnull ValueMap valueMap, @Nonnull ValueMap arguments)
+    public String validate(@Nonnull String data, @Nonnull ValueMap valueMap, Resource resource, @Nonnull ValueMap arguments)
             throws SlingValidationException {
         String regex = arguments.get(REGEX_PARAM, "");
         if (StringUtils.isEmpty(regex)) {

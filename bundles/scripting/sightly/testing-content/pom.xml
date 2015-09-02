@@ -25,8 +25,8 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
-        <relativePath />
+        <version>24</version>
+        <relativePath/>
     </parent>
 
     <!-- ======================================================================= -->
@@ -49,10 +49,6 @@
         <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/bundles/scripting/sightly/testing-content</developerConnection>
         <url>http://svn.apache.org/viewvc/sling/trunk/bundles/scripting/sightly/testing-content</url>
     </scm>
-
-    <properties>
-        <sling.java.version>6</sling.java.version>
-    </properties>
 
 
     <!-- ======================================================================= -->
@@ -78,6 +74,10 @@
                         <excludes combine.children="append">
                             <exclude>src/main/resources/SLING-INF/**/*.json</exclude>
                             <exclude>src/main/resources/SLING-INF/**/*.ecma</exclude>
+                            <!-- Ignore files generated bei IDE plugins e.g. maven-eclipse-plugin -->
+                            <exclude>maven-eclipse.xml</exclude>
+                            <exclude>.*</exclude>
+                            <exclude>.*/**</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
@@ -203,6 +203,12 @@
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.api</artifactId>
             <version>2.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sling</groupId>
+            <artifactId>org.apache.sling.scripting.sightly</artifactId>
+            <version>1.0.2</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

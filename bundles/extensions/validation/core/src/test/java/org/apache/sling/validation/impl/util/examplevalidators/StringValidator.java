@@ -20,14 +20,15 @@ package org.apache.sling.validation.impl.util.examplevalidators;
 
 import javax.annotation.Nonnull;
 
+import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
-import org.apache.sling.validation.api.Validator;
-import org.apache.sling.validation.api.exceptions.SlingValidationException;
+import org.apache.sling.validation.Validator;
+import org.apache.sling.validation.exceptions.SlingValidationException;
 
 public class StringValidator implements Validator<String> {
 
     @Override
-    public String validate(@Nonnull String data, @Nonnull ValueMap valueMap, @Nonnull ValueMap arguments)
+    public String validate(@Nonnull String data, @Nonnull ValueMap valueMap, Resource resource, @Nonnull ValueMap arguments)
             throws SlingValidationException {
         return null;
     }

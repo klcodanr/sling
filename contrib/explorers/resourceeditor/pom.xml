@@ -58,7 +58,11 @@
 				<extensions>true</extensions>
 				<configuration>
 					<instructions>
-						<Sling-Initial-Content>SLING-INF/libs/sling/resource-editor-static-content;overwrite:=true;path:=/libs/sling/resource-editor-static-content,SLING-INF/libs/sling/resource-editor;overwrite:=true;path:=/libs/sling/resource-editor</Sling-Initial-Content>
+						<Sling-Initial-Content>
+							META-INF/tags;overwrite:=true;path:=/libs/sling/resource-editor-tags/property-editor,
+							SLING-INF/libs/sling/resource-editor-static-content;overwrite:=true;path:=/libs/sling/resource-editor-static-content,
+							SLING-INF/libs/sling/resource-editor;overwrite:=true;path:=/libs/sling/resource-editor
+						</Sling-Initial-Content>
 						<Import-Package>!org.slf4j.impl,*,
 							org.apache.sling.commons.js.nodetypes.javascript,
 							javax.el,
@@ -80,6 +84,8 @@
 							org.xml.sax.helpers
 						</Import-Package>
 						<Export-Package>!org.apache.sling.reseditor</Export-Package>
+			            <Include-Resource>META-INF/resource-editor.tld=${project.build.outputDirectory}/META-INF/resource-editor.tld,{maven-resources}</Include-Resource>
+			            <Sling-Bundle-Resources>/META-INF/tags</Sling-Bundle-Resources>
 					</instructions>
 					<remoteOBR>www.jcrbrowser.org</remoteOBR>
 				</configuration>
@@ -87,7 +93,7 @@
 			<plugin>
 		        <groupId>com.github.eirslett</groupId>
 		        <artifactId>frontend-maven-plugin</artifactId>
-		        <version>0.0.23</version>
+		        <version>0.0.24</version>
 		        <configuration>
 			        <workingDirectory>frontend</workingDirectory>
 			    </configuration>
@@ -119,7 +125,12 @@
                   <exclude>src/main/resources/SLING-INF/libs/sling/resource-editor/servlet-nodes.json</exclude>
                 </excludes>
               </configuration>
-            </plugin>		    
+            </plugin>	
+            <plugin>
+				<groupId>org.apache.sling</groupId>
+				<artifactId>maven-sling-plugin</artifactId>
+				<version>2.1.1-SNAPSHOT</version>
+            </plugin>		
 		</plugins>
 		<extensions>
 			<extension>
@@ -171,6 +182,12 @@
 			<artifactId>org.apache.felix.scr.annotations</artifactId>
 			<scope>provided</scope>
 		</dependency>
+	    <dependency>
+	      <groupId>commons-lang</groupId>
+	      <artifactId>commons-lang</artifactId>
+	      <version>2.5</version>
+	      <scope>provided</scope>
+	    </dependency>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
@@ -178,10 +195,4 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-	<distributionManagement>
-		<repository>
-			<id>www.jcrbrowser.org</id>
-			<url>dav:http://www.jcrbrowser.org/sling/obr</url>
-		</repository>
-	</distributionManagement>
 </project>

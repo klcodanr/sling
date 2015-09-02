@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
+        <version>24</version>
         <relativePath/>
     </parent>
 
@@ -64,9 +64,6 @@
                         <Private-Package>
                             org.apache.sling.launchpad.testservices.*
                         </Private-Package>
-                        <Sling-Namespaces>
-                            test1=http://sling.apache.org/test/one
-                        </Sling-Namespaces>
                         <Sling-Nodetypes>
                             SLING-INF/nodetypes/test.cnd
                         </Sling-Nodetypes>

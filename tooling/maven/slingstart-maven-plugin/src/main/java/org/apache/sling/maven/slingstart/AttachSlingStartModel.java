@@ -28,6 +28,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.sling.provisioning.model.Model;
+import org.apache.sling.provisioning.model.ModelUtility;
 import org.apache.sling.provisioning.model.io.ModelWriter;
 
 /**
@@ -43,7 +44,13 @@ public class AttachSlingStartModel extends AbstractSlingStartMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        final Model model = ProjectHelper.getRawModel(this.project);
+        Model model = ProjectHelper.getRawModel(this.project);
+        if (usePomVariables) {
+            model = ModelUtility.applyVariables(model, new PomVariableResolver(project));
+        }
+        if (usePomDependencies) {
+            model = ModelUtility.applyArtifactVersions(model, new PomArtifactVersionResolver(project, allowUnresolvedPomDependencies));
+        }
 
         // write the model
         final File outputFile = new File(this.project.getBuild().getDirectory() + File.separatorChar + BuildConstants.MODEL_ARTIFACT_NAME);
@@ -51,8 +58,6 @@ public class AttachSlingStartModel extends AbstractSlingStartMojo {
 
         Writer writer = null;
         try {
-
-
             writer = new FileWriter(outputFile);
             ModelWriter.write(writer, model);
         } catch (IOException e) {

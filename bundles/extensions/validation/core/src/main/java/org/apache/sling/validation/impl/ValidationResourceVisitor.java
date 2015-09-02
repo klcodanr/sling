@@ -20,38 +20,40 @@ package org.apache.sling.validation.impl;
 
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import javax.annotation.Nonnull;
 
+import org.apache.commons.collections.Predicate;
 import org.apache.sling.api.resource.AbstractResourceVisitor;
 import org.apache.sling.api.resource.Resource;
-import org.apache.sling.validation.api.ValidationModel;
-import org.apache.sling.validation.api.ValidationResult;
+import org.apache.sling.api.resource.ResourceUtil;
+import org.apache.sling.validation.ValidationResult;
+import org.apache.sling.validation.model.ValidationModel;
 
 public class ValidationResourceVisitor extends AbstractResourceVisitor {
 
     private final ValidationServiceImpl validationService;
-    private final boolean enforceValidation;
-    private final @Nonnull ValidationResultImpl result;
-    private final Set<String> ignoredResourceTypes;
     private final String rootResourcePath;
+    private final boolean enforceValidation;
+    private final boolean considerResourceSuperTypeModels;
+    private final @Nonnull ValidationResultImpl result;
+    private final Predicate filter;
 
-    public ValidationResourceVisitor(ValidationServiceImpl validationService, String rootResourcePath, boolean enforceValidation, Set<String> ignoredResourceTypes) {
+    public ValidationResourceVisitor(ValidationServiceImpl validationService, String rootResourcePath, boolean enforceValidation, Predicate filter,  boolean considerResourceSuperTypeModels) {
         super();
         this.validationService = validationService;
         this.rootResourcePath = rootResourcePath + "/";
         this.enforceValidation = enforceValidation;
-        this.ignoredResourceTypes = ignoredResourceTypes;
+        this.considerResourceSuperTypeModels = considerResourceSuperTypeModels;
+        this.filter = filter;
         this.result = new ValidationResultImpl();
     }
 
     @Override
     protected void visit(Resource resource) {
         if (isValidSubResource(resource)) {
-            // JCR will return then primary type instead!!
             @SuppressWarnings("null")
-            ValidationModel model = validationService.getValidationModel(resource);
+            ValidationModel model = validationService.getValidationModel(resource, considerResourceSuperTypeModels);
             if (model == null) {
                 if (enforceValidation) {
                     throw new IllegalArgumentException("No model for resource type " + resource.getResourceType() + " found.");
@@ -80,11 +82,11 @@ public class ValidationResourceVisitor extends AbstractResourceVisitor {
      * @return {@code true} in case the given resource should have its own Sling Validation model
      */
     private boolean isValidSubResource(Resource resource) {
-        if (resource.getResourceType() == Resource.RESOURCE_TYPE_NON_EXISTING) {
+        if (ResourceUtil.isNonExistingResource(resource)) {
             return false;
         }
-        if (ignoredResourceTypes.contains(resource.getResourceType())) {
-            return false;
+        if (filter != null) {
+            return filter.evaluate(resource);
         }
         return true;
     }

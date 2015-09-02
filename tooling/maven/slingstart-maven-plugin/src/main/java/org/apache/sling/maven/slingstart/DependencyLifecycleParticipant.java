@@ -19,6 +19,8 @@ package org.apache.sling.maven.slingstart;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,6 +46,7 @@ import org.apache.sling.provisioning.model.Feature;
 import org.apache.sling.provisioning.model.Model;
 import org.apache.sling.provisioning.model.ModelConstants;
 import org.apache.sling.provisioning.model.ModelUtility;
+import org.apache.sling.provisioning.model.ModelUtility.ResolverOptions;
 import org.apache.sling.provisioning.model.RunMode;
 import org.apache.sling.provisioning.model.Traceable;
 import org.apache.sling.provisioning.model.io.ModelReader;
@@ -74,11 +77,14 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
     private ArtifactResolver resolver;
 
     public static final class ProjectInfo {
+
         public MavenProject project;
         public Plugin       plugin;
         public Model        localModel;
         public boolean      done = false;
         public Model        model;
+        public final Map<org.apache.sling.provisioning.model.Artifact, Model> includedModels = new HashMap<org.apache.sling.provisioning.model.Artifact, Model>();
+
     }
 
     public static final class Environment {
@@ -139,22 +145,35 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
         final String directory = nodeValue(info.plugin,
                 "modelDirectory",
                 new File(info.project.getBasedir(), "src/main/provisioning").getAbsolutePath());
+        final String inlinedModel = nodeValue(info.plugin,
+                "model", null);
         try {
-            info.localModel = readLocalModel(info.project, new File(directory), env.logger);
+            info.localModel = readLocalModel(info.project, inlinedModel, new File(directory), env.logger);
         } catch ( final IOException ioe) {
             throw new MavenExecutionException(ioe.getMessage(), ioe);
         }
 
-        // we have to create an effective model to add the dependencies
-        final Model effectiveModel = ModelUtility.getEffectiveModel(info.localModel, null);
+        // prepare resolver options
+        ResolverOptions resolverOptions = new ResolverOptions();
+        if (nodeBooleanValue(info.plugin, "usePomVariables", false)) {
+            resolverOptions.variableResolver(new PomVariableResolver(info.project));
+        }
+        if (nodeBooleanValue(info.plugin, "usePomDependencies", false)) {
+            resolverOptions.artifactVersionResolver(new PomArtifactVersionResolver(info.project,
+                    nodeBooleanValue(info.plugin, "allowUnresolvedPomDependencies", false)));
+        }
 
-        final List<Model> dependencies = searchSlingstartDependencies(env, info, effectiveModel);
+        // we have to create an effective model to add the dependencies
+        final Model effectiveModel = ModelUtility.getEffectiveModel(info.localModel, resolverOptions);
+
+        final List<Model> dependencies = searchSlingstartDependencies(env, info, info.localModel, effectiveModel);
         info.model = new Model();
         for(final Model d : dependencies) {
             ModelUtility.merge(info.model, d);
         }
-        ModelUtility.merge(info.model, effectiveModel);
-        info.model = ModelUtility.getEffectiveModel(info.model, null);
+        ModelUtility.merge(info.model, info.localModel);
+        info.localModel = info.model;
+        info.model = ModelUtility.getEffectiveModel(info.model, resolverOptions);
 
         final Map<Traceable, String> errors = ModelUtility.validate(info.model);
         if ( errors != null ) {
@@ -236,6 +255,7 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
     private static List<Model> searchSlingstartDependencies(
             final Environment env,
             final ProjectInfo info,
+            final Model rawModel,
             final Model effectiveModel)
     throws MavenExecutionException {
         // slingstart or slingfeature
@@ -266,27 +286,35 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
 
                             // if it's a project from the current reactor build, we can't resolve it right now
                             final String key = a.getGroupId() + ":" + a.getArtifactId();
-                            if ( env.modelProjects.containsKey(key) ) {
+                            final ProjectInfo depInfo = env.modelProjects.get(key);
+                            if ( depInfo != null ) {
                                 env.logger.debug("Found reactor " + a.getType() + " dependency : " + a);
-                                final Model model = addDependencies(env, env.modelProjects.get(key));
+                                final Model model = addDependencies(env, depInfo);
                                 if ( model == null ) {
                                     throw new MavenExecutionException("Recursive model dependency list including project " + info.project, (File)null);
                                 }
                                 dependencies.add(model);
+                                info.includedModels.put(a, depInfo.localModel);
+
                             } else {
                                 env.logger.debug("Found external " + a.getType() + " dependency: " + a);
+
                                 // "external" dependency, we can already resolve it
                                 final File modelFile = resolveSlingstartArtifact(env, info.project, dep);
                                 FileReader r = null;
                                 try {
                                     r = new FileReader(modelFile);
-                                    final Model m = ModelReader.read(r, modelFile.getAbsolutePath());
+                                    final Model model = ModelReader.read(r, modelFile.getAbsolutePath());
 
-                                    final Map<Traceable, String> errors = ModelUtility.validate(m);
+                                    info.includedModels.put(a, model);
+
+                                    final Map<Traceable, String> errors = ModelUtility.validate(model);
                                     if ( errors != null ) {
                                         throw new MavenExecutionException("Unable to read model file from " + modelFile + " : " + errors, modelFile);
                                     }
-                                    dependencies.add(m);
+                                    final Model fullModel = processSlingstartDependencies(env, info, dep,  model);
+
+                                    dependencies.add(fullModel);
                                 } catch ( final IOException ioe) {
                                     throw new MavenExecutionException("Unable to read model file from " + modelFile, ioe);
                                 } finally {
@@ -299,14 +327,22 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
                                     }
                                 }
                             }
-                            env.logger.debug("- adding dependency " + ModelUtils.toString(dep));
-                            info.project.getDependencies().add(dep);
 
                             removeList.add(a);
                         }
                     }
                     for(final org.apache.sling.provisioning.model.Artifact r : removeList) {
                         group.remove(r);
+                        final Feature localModelFeature = rawModel.getFeature(feature.getName());
+                        if ( localModelFeature != null ) {
+                            final RunMode localRunMode = localModelFeature.getRunMode(runMode.getNames());
+                            if ( localRunMode != null ) {
+                                final ArtifactGroup localAG = localRunMode.getArtifactGroup(group.getStartLevel());
+                                if ( localAG != null ) {
+                                    localAG.remove(r);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -315,6 +351,35 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
         return dependencies;
     }
 
+    private static Model processSlingstartDependencies(final Environment env, final ProjectInfo info, final Dependency dep, final Model rawModel)
+    throws MavenExecutionException {
+        env.logger.debug("Processing dependency " + dep);
+
+        // we have to create an effective model to add the dependencies
+        final Model effectiveModel = ModelUtility.getEffectiveModel(rawModel, new ResolverOptions());
+
+        final List<Model> dependencies = searchSlingstartDependencies(env, info, rawModel, effectiveModel);
+        Model mergingModel = new Model();
+        for(final Model d : dependencies) {
+            ModelUtility.merge(mergingModel, d);
+        }
+        ModelUtility.merge(mergingModel, rawModel);
+
+        final Map<Traceable, String> errors = ModelUtility.validate(ModelUtility.getEffectiveModel(mergingModel, new ResolverOptions()));
+        if ( errors != null ) {
+            throw new MavenExecutionException("Unable to create model file for " + dep + " : " + errors, (File)null);
+        }
+
+        return mergingModel;
+    }
+
+    /**
+     * Gets plugins configuration from POM (string parameter).
+     * @param plugin Plugin
+     * @param name Configuration parameter.
+     * @param defaultValue Default value that is returned if parameter is not set
+     * @return Parameter value or default value.
+     */
     private static String nodeValue(final Plugin plugin, final String name, final String defaultValue) {
         final Xpp3Dom config = plugin == null ? null : (Xpp3Dom)plugin.getConfiguration();
         final Xpp3Dom node = (config == null ? null : config.getChild(name));
@@ -323,6 +388,18 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
         } else {
             return defaultValue;
         }
+    }
+
+    /**
+     * Gets plugins configuration from POM (boolean parameter).
+     * @param plugin Plugin
+     * @param name Configuration parameter.
+     * @param defaultValue Default value that is returned if parameter is not set
+     * @return Parameter value or default value.
+     */
+    private static boolean nodeBooleanValue(final Plugin plugin, final String name, final boolean defaultValue) {
+        String booleanValue = nodeValue(plugin, name, Boolean.toString(defaultValue));
+        return "true".equals(booleanValue.toLowerCase());
     }
 
     private static File resolveSlingstartArtifact(final Environment env,
@@ -356,6 +433,7 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
      */
     private static Model readLocalModel(
             final MavenProject project,
+            final String inlinedModel,
             final File modelDirectory,
             final Logger logger)
     throws MavenExecutionException, IOException {
@@ -370,10 +448,28 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
             }
             Collections.sort(candidates);
         }
-        if ( candidates.size() == 0 ) {
-            throw new MavenExecutionException("No model files found in " + modelDirectory, (File)null);
+        if ( candidates.size() == 0 && (inlinedModel == null || inlinedModel.trim().length() == 0) ) {
+            throw new MavenExecutionException("No model files found in " + modelDirectory + ", and no model inlined in POM.", (File)null);
         }
         final Model result = new Model();
+        if ( inlinedModel != null ) {
+            logger.debug("Reading inlined model from project " + project.getId());
+            try {
+                final Reader reader = new StringReader(inlinedModel);
+                try {
+                    final Model current = ModelReader.read(reader, "pom");
+                    final Map<Traceable, String> errors = ModelUtility.validate(current);
+                    if (errors != null ) {
+                        throw new MavenExecutionException("Invalid inlined model : " + errors, (File)null);
+                    }
+                    ModelUtility.merge(result, current, false);
+                } finally {
+                    IOUtils.closeQuietly(reader);
+                }
+            } catch ( final IOException io) {
+                throw new MavenExecutionException("Unable to read inlined model", io);
+            }
+        }
         for(final String name : candidates) {
             logger.debug("Reading model " + name + " in project " + project.getId());
             try {
@@ -385,7 +481,7 @@ public class DependencyLifecycleParticipant extends AbstractMavenLifecyclePartic
                     if (errors != null ) {
                         throw new MavenExecutionException("Invalid model at " + name + " : " + errors, (File)null);
                     }
-                    ModelUtility.merge(result, current);
+                    ModelUtility.merge(result, current, false);
                 } finally {
                     IOUtils.closeQuietly(reader);
                 }

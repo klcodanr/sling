@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>22</version>
+        <version>24</version>
         <relativePath/>
     </parent>
 
@@ -41,7 +41,6 @@
         <url.version>1.5.2</url.version>
         <org.ops4j.pax.logging.DefaultServiceLog.level>INFO</org.ops4j.pax.logging.DefaultServiceLog.level>
         <felix.shell>false</felix.shell>
-        <sling.java.version>6</sling.java.version>
         <sling.hc.samples.version>1.0.7-SNAPSHOT</sling.hc.samples.version>
         <sling.hc.core.version>1.2.3-SNAPSHOT</sling.hc.core.version>
     </properties>
@@ -122,5 +121,16 @@
             <version>4.2.1</version>
             <scope>test</scope>
         </dependency>
-     </dependencies>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.compendium</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.http.servlet-api</artifactId>
+            <version>1.1.0</version>
+            <scope>test</scope>
+        </dependency>   
+    </dependencies>
 </project>

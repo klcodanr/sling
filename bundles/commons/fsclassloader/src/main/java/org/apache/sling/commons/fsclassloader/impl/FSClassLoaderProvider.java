@@ -76,7 +76,7 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 
 	private ServiceTracker<ClassLoaderWriterListener, ClassLoaderWriterListener> serviceTracker;
 
-	private Map<Long, ClassLoaderWriterListener> classLoaderWriterListeners = new HashMap<Long, ClassLoaderWriterListener>();
+	private Map<Long, ServiceReference<ClassLoaderWriterListener>> classLoaderWriterListeners = new HashMap<Long, ServiceReference<ClassLoaderWriterListener>>();
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -116,14 +116,14 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 					@Override
 					public void modifiedService(final ServiceReference<ClassLoaderWriterListener> reference,
 							final ClassLoaderWriterListener service) {
-						classLoaderWriterListeners.put(getId(reference), service);
+						classLoaderWriterListeners.put(getId(reference), reference);
 					}
 
 					@Override
 					public ClassLoaderWriterListener addingService(
 							final ServiceReference<ClassLoaderWriterListener> reference) {
 						ClassLoaderWriterListener service = componentContext.getBundleContext().getService(reference);
-						classLoaderWriterListeners.put(getId(reference), service);
+						classLoaderWriterListeners.put(getId(reference), reference);
 						return service;
 					}
 
@@ -241,8 +241,15 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 				for (final String n : names) {
 					this.checkClassLoader(n);
 				}
-				for(ClassLoaderWriterListener listener : classLoaderWriterListeners.values()){
-					listener.onClassLoaderClear(name);
+				for(ServiceReference<ClassLoaderWriterListener> reference : classLoaderWriterListeners.values()){
+					if(reference != null){
+						ClassLoaderWriterListener listener = callerBundle.getBundleContext().getService(reference);
+						if(listener != null){
+							listener.onClassLoaderClear(name);
+						} else {
+							logger.warn("Found ClassLoaderWriterListener Service reference with no service bound");
+						}
+					}
 				}
 			}
 

@@ -22,6 +22,7 @@ do_cleanup () {
 	echo "################################################################################"
 	if [ -n "$PID" ] && [ "$LEAVE_RUNNING" -eq "0" ]; then
 		if ps -p $PID > /dev/null 2>&1; then
+			pkill -TERM -P $PID
 			kill $PID
 			echo "Stopped Sling process $PID..."
 		else

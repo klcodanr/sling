@@ -131,15 +131,18 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "                            SETTING UP SLING INSTANCE                           "
 	echo "################################################################################"
 	mkdir -p ${DOWNLOAD}/run
-	echo "Downloading Sling Launchpad..."
-	mvn org.apache.maven.plugins:maven-dependency-plugin:2.8:get -DremoteRepositories=http://repository.apache.org/snapshots \
-		-DgroupId=org.apache.sling -DartifactId=org.apache.sling.launchpad \
-		-Dversion=8-SNAPSHOT > ${DOWNLOAD}/logs/sling-download.log 2>&1
-	mvn org.apache.maven.plugins:maven-dependency-plugin:2.8:copy -DremoteRepositories=http://repository.apache.org/snapshots \
-		-Dartifact=org.apache.sling:org.apache.sling.launchpad:8-SNAPSHOT:jar \
-		-DoutputDirectory=${DOWNLOAD}/run >> ${DOWNLOAD}/logs/sling-download.log 2>&1
-	echo "Starting Sling instance at ${DOWNLOAD}/run/*launchpad*.jar on port ${PORT}..."
-	java -jar ${DOWNLOAD}/run/*launchpad*.jar -c ${DOWNLOAD}/run/sling -p $PORT > \
+	
+	if [ ! -e "${DOWNLOAD}/run/testing" ]; then
+		echo "Downloading Sling Testing Project to ${DOWNLOAD}/run/testing..."
+		mkdir -p ${DOWNLOAD}/run/testing
+		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/testing/ \
+			${DOWNLOAD}/run/testing/ > /dev/null 2>&1
+	else 
+		echo "Updating Sling Trunk at ${DOWNLOAD}/run/testing..."
+		svn up ${DOWNLOAD}/run/testing/ > /dev/null 2>&1
+	fi
+	echo "Starting Sling on port ${PORT}..."
+	mvn clean install -f launchpad/testing/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
 		${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
 	echo $! > ${DOWNLOAD}/run/sling.pid

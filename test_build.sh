@@ -35,7 +35,7 @@ function checkkill () {
 # Initialize our variables
 PORT="8080"
 TESTS="**/integrationtest/**/*Test.java"
-DIR=$(dirname $(readlink -f $0))
+DIR=$(dirname $0)
 
 while getopts "hp:t:" opt; do
 	case "$opt" in

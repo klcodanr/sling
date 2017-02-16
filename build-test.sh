@@ -19,7 +19,7 @@ function checkkill () {
 		kill $PID
 		echo "Stopped Sling process $PID..."
 	else
-		echo "To stop sling, execute: kill $PID"
+		echo "To stop sling, execute: pkill -TERM -P $PID && kill $PID"
 	fi
 }
 

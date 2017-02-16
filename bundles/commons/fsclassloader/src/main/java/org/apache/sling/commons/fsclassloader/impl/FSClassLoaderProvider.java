@@ -45,10 +45,10 @@ import org.apache.sling.commons.osgi.PropertiesUtil;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.Constants;
 import org.osgi.framework.InvalidSyntaxException;
+import org.osgi.framework.ServiceEvent;
+import org.osgi.framework.ServiceListener;
 import org.osgi.framework.ServiceReference;
 import org.osgi.service.component.ComponentContext;
-import org.osgi.util.tracker.ServiceTracker;
-import org.osgi.util.tracker.ServiceTrackerCustomizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +74,7 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 	/** Current class loader */
 	private FSDynamicClassLoader loader;
 
-	private ServiceTracker<ClassLoaderWriterListener, ClassLoaderWriterListener> serviceTracker;
+	private ServiceListener classLoaderWriterServiceListener;
 
 	private Map<Long, ServiceReference<ClassLoaderWriterListener>> classLoaderWriterListeners = new HashMap<Long, ServiceReference<ClassLoaderWriterListener>>();
 
@@ -103,47 +103,37 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 		this.callerBundle = componentContext.getUsingBundle();
 
 		classLoaderWriterListeners.clear();
-		this.serviceTracker = new ServiceTracker<ClassLoaderWriterListener, ClassLoaderWriterListener>(
-				componentContext.getBundleContext(), componentContext.getBundleContext().createFilter(LISTENER_FILTER),
-				new ServiceTrackerCustomizer<ClassLoaderWriterListener, ClassLoaderWriterListener>() {
+		
 
-					@Override
-					public void removedService(final ServiceReference<ClassLoaderWriterListener> reference,
-							final ClassLoaderWriterListener service) {
-						classLoaderWriterListeners.remove(getId(reference));
-					}
+		this.classLoaderWriterServiceListener = new ServiceListener() {
+			@Override
+			public void serviceChanged(ServiceEvent event) {
+				ServiceReference<ClassLoaderWriterListener> reference = (ServiceReference<ClassLoaderWriterListener>) event.getServiceReference();
+				if(event.getType() == ServiceEvent.MODIFIED || event.getType() == ServiceEvent.REGISTERED){
+					classLoaderWriterListeners.put(getId(reference), reference);
+				} else {
+					classLoaderWriterListeners.remove(getId(reference));
+				}
+			}
 
-					@Override
-					public void modifiedService(final ServiceReference<ClassLoaderWriterListener> reference,
-							final ClassLoaderWriterListener service) {
-						classLoaderWriterListeners.put(getId(reference), reference);
-					}
-
-					@Override
-					public ClassLoaderWriterListener addingService(
-							final ServiceReference<ClassLoaderWriterListener> reference) {
-						ClassLoaderWriterListener service = componentContext.getBundleContext().getService(reference);
-						classLoaderWriterListeners.put(getId(reference), reference);
-						return service;
-					}
-
-					private Long getId(ServiceReference<ClassLoaderWriterListener> reference) {
-						return PropertiesUtil.toLong(reference.getProperty(Constants.SERVICE_ID), -1);
-					}
-				});
-		this.serviceTracker.open();
+			private Long getId(ServiceReference<ClassLoaderWriterListener> reference) {
+				return PropertiesUtil.toLong(reference.getProperty(Constants.SERVICE_ID), -1);
+			}
+		};
+		componentContext.getBundleContext().addServiceListener(classLoaderWriterServiceListener, LISTENER_FILTER);
+		
 	}
 
 	/**
 	 * Deactivate this component. Create the root directory.
 	 */
 	@Deactivate
-	protected void deactivate() {
+	protected void deactivate(ComponentContext componentContext) {
 		this.root = null;
 		this.rootURL = null;
 		this.destroyClassLoader();
-		if (this.serviceTracker != null) {
-			this.serviceTracker.close();
+		if (this.classLoaderWriterServiceListener != null) {
+			componentContext.getBundleContext().removeServiceListener(classLoaderWriterServiceListener);
 		}
 	}
 

@@ -23,7 +23,7 @@ function checkrc () {
 
 function checkkill () {
 	read -p "Stop Sling Instance? (y/n) " STOP
-	if [ $STOP = "y" ]; then
+	if [[ $STOP =~ ^[Yy]$ ]]; then
 		pkill -TERM -P $PID
 		kill $PID
 		echo "Stopped Sling process $PID..."
@@ -113,16 +113,18 @@ for line in $lines; do
 	bundle="${params[1]}"
 	if [[ ! -z "$bundle" ]]; then	
 		echo "Installing $project/target/$bundle..."
-		curl -u admin:admin -F action=install -F bundlestartlevel=20 -F bundlefile=@"$DIR/$project/target/$bundle" http://localhost:$PORT/system/console/bundles
+		curl -u admin:admin -F action=install -F refreshPackages=true -F bundlestart=true -F bundlefile=@"$DIR/$project/target/$bundle" http://localhost:$PORT/system/console/bundles
 		rc=$?
 		checkrc
 		echo "bundle: GOOD : Successfully installed $bundle"
+		read -rsp $'Press enter to continue...\n'
 	fi
 done
 
 echo "################################################################################"
 echo "                             CHECK INTEGRATION TESTS                            "
 echo "################################################################################"
+echo "Running Sling Integration Tests $TESTS..."
 mvn test  -f $DIR/launchpad/integration-tests/pom.xml  -Dtest=$TESTS
 rc=$?
 checkrc

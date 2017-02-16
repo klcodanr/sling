@@ -29,8 +29,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
 
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
@@ -41,6 +45,7 @@ import org.apache.felix.scr.annotations.Service;
 import org.apache.sling.commons.classloader.ClassLoaderWriter;
 import org.apache.sling.commons.classloader.ClassLoaderWriterListener;
 import org.apache.sling.commons.classloader.DynamicClassLoaderManager;
+import org.apache.sling.commons.fsclassloader.FSClassLoaderMBean;
 import org.apache.sling.commons.osgi.PropertiesUtil;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.Constants;
@@ -48,6 +53,7 @@ import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceEvent;
 import org.osgi.framework.ServiceListener;
 import org.osgi.framework.ServiceReference;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,16 +92,19 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 	/** The bundle asking for this service instance */
 	private Bundle callerBundle;
 
+	private ServiceRegistration<?> mbeanRegistration;
+
 	/**
 	 * Activate this component. Create the root directory.
 	 * 
 	 * @param componentContext
 	 * @throws MalformedURLException
 	 * @throws InvalidSyntaxException
+	 * @throws MalformedObjectNameException
 	 */
 	@Activate
 	protected void activate(final ComponentContext componentContext)
-			throws MalformedURLException, InvalidSyntaxException {
+			throws MalformedURLException, InvalidSyntaxException, MalformedObjectNameException {
 		// get the file root
 		this.root = new File(componentContext.getBundleContext().getDataFile(""), "classes");
 		this.root.mkdirs();
@@ -103,13 +112,13 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 		this.callerBundle = componentContext.getUsingBundle();
 
 		classLoaderWriterListeners.clear();
-		
 
 		this.classLoaderWriterServiceListener = new ServiceListener() {
 			@Override
 			public void serviceChanged(ServiceEvent event) {
-				ServiceReference<ClassLoaderWriterListener> reference = (ServiceReference<ClassLoaderWriterListener>) event.getServiceReference();
-				if(event.getType() == ServiceEvent.MODIFIED || event.getType() == ServiceEvent.REGISTERED){
+				ServiceReference<ClassLoaderWriterListener> reference = (ServiceReference<ClassLoaderWriterListener>) event
+						.getServiceReference();
+				if (event.getType() == ServiceEvent.MODIFIED || event.getType() == ServiceEvent.REGISTERED) {
 					classLoaderWriterListeners.put(getId(reference), reference);
 				} else {
 					classLoaderWriterListeners.remove(getId(reference));
@@ -121,7 +130,18 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 			}
 		};
 		componentContext.getBundleContext().addServiceListener(classLoaderWriterServiceListener, LISTENER_FILTER);
-		
+
+		// handle the MBean Installation
+		Hashtable<String, String> jmxProps = new Hashtable<String, String>();
+		jmxProps.put("type", "ClassLoader");
+		jmxProps.put("name", "FSClassLoader");
+
+		final Hashtable<String, Object> mbeanProps = new Hashtable<String, Object>();
+		mbeanProps.put(Constants.SERVICE_DESCRIPTION, "Apache Sling FSClassLoader Controller Service");
+		mbeanProps.put(Constants.SERVICE_VENDOR, "The Apache Software Foundation");
+		mbeanProps.put("jmx.objectname", new ObjectName("org.apache.sling.classloader", jmxProps));
+		mbeanRegistration = componentContext.getBundleContext().registerService(FSClassLoaderMBean.class.getName(),
+				new FSClassLoaderMBeanImpl(this, componentContext.getBundleContext()), mbeanProps);
 	}
 
 	/**
@@ -134,6 +154,9 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 		this.destroyClassLoader();
 		if (this.classLoaderWriterServiceListener != null) {
 			componentContext.getBundleContext().removeServiceListener(classLoaderWriterServiceListener);
+		}
+		if (mbeanRegistration != null) {
+			mbeanRegistration.unregister();
 		}
 	}
 
@@ -231,10 +254,10 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 				for (final String n : names) {
 					this.checkClassLoader(n);
 				}
-				for(ServiceReference<ClassLoaderWriterListener> reference : classLoaderWriterListeners.values()){
-					if(reference != null){
+				for (ServiceReference<ClassLoaderWriterListener> reference : classLoaderWriterListeners.values()) {
+					if (reference != null) {
 						ClassLoaderWriterListener listener = callerBundle.getBundleContext().getService(reference);
-						if(listener != null){
+						if (listener != null) {
 							listener.onClassLoaderClear(name);
 						} else {
 							logger.warn("Found ClassLoaderWriterListener Service reference with no service bound");

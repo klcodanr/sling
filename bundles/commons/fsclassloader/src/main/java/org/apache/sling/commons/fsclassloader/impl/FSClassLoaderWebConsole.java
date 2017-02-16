@@ -73,74 +73,7 @@ public class FSClassLoaderWebConsole extends AbstractWebConsolePlugin {
     @Reference(target = "(component.name=org.apache.sling.commons.fsclassloader.impl.FSClassLoaderProvider)")
     private ClassLoaderWriter classLoaderWriter;
 
-    /**
-     * Represents a set of class, java and deps files for a script.
-     */
-    private static class ScriptFiles {
-
-        /**
-         * Gets the script associated with the file.
-         *
-         * @param file
-         *            the file to find the associate script
-         * @return the associated script
-         */
-        public static String getScript(File file) {
-            String relative = file.getAbsolutePath().substring(
-                    root.getAbsolutePath().length());
-            String script = remove(relative, "/org/apache/jsp");
-            script = remove(script, ".class");
-            script = remove(script, ".java");
-            script = remove(script, ".deps");
-            if (File.separatorChar == '\\') {
-                script = script.replace(File.separatorChar, '/');
-            }
-            return StringUtils.substringBeforeLast(script, "_") + "."
-                    + StringUtils.substringAfterLast(script, "_");
-        }
-
-        private static String remove(String orig, String rem) {
-            return orig.replace(rem, "");
-        }
-
-        private final String classFile;
-        private final String depsFile;
-
-        private final String javaFile;
-
-        private final String script;
-
-        public ScriptFiles(File file) {
-            script = getScript(file);
-
-            String relative = file.getAbsolutePath().substring(
-                    root.getAbsolutePath().length());
-
-            relative = remove(relative, ".class");
-            relative = remove(relative, ".deps");
-            relative = remove(relative, ".java");
-            classFile = relative + ".class";
-            depsFile = relative + ".deps";
-            javaFile = relative + ".java";
-        }
-
-        public String getClassFile() {
-            return classFile;
-        }
-
-        public String getDepsFile() {
-            return depsFile;
-        }
-
-        public String getJavaFile() {
-            return javaFile;
-        }
-
-        public String getScript() {
-            return script;
-        }
-
-    }
+    
 
     /**
      * The root under which the class files are under
@@ -164,7 +97,6 @@ public class FSClassLoaderWebConsole extends AbstractWebConsolePlugin {
      * @throws MalformedURLException
      */
     @Activate
-    @SuppressWarnings("unused")
     protected void activate(final ComponentContext componentContext)
             throws MalformedURLException {
         // get the file root
@@ -332,7 +264,7 @@ public class FSClassLoaderWebConsole extends AbstractWebConsolePlugin {
      * @throws IOException
      *             an exception occurs reading the files
      */
-    private void readFiles(File file, Map<String, ScriptFiles> scripts)
+    protected static void readFiles(File file, Map<String, ScriptFiles> scripts)
             throws IOException {
         if (file.isDirectory()) {
             File[] children = file.listFiles();
@@ -342,10 +274,10 @@ public class FSClassLoaderWebConsole extends AbstractWebConsolePlugin {
                 }
             }
         } else {
-            String script = ScriptFiles.getScript(file);
+            String script = ScriptFiles.getScript(root, file);
             if (!scripts.containsKey(script)
                     && file.getName().endsWith(".java")) {
-                scripts.put(script, new ScriptFiles(file));
+                scripts.put(script, new ScriptFiles(root, file));
             }
         }
     }
@@ -382,7 +314,7 @@ public class FSClassLoaderWebConsole extends AbstractWebConsolePlugin {
                 w.write("<p class=\"statline ui-state-highlight\">Viewing Script: "
                         + root + file + "</p><br/><br/>");
 
-                ScriptFiles scriptFiles = new ScriptFiles(toView);
+                ScriptFiles scriptFiles = new ScriptFiles(root, toView);
 
                 w.write("<table class=\"nicetable ui-widget\">");
                 w.write("<tr class=\"header ui-widget-header\">");

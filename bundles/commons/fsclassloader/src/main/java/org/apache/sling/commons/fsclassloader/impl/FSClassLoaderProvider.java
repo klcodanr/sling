@@ -80,7 +80,7 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 	/** Current class loader */
 	private FSDynamicClassLoader loader;
 
-	private ServiceListener classLoaderWriterServiceListener;
+	private static ServiceListener classLoaderWriterServiceListener;
 
 	private Map<Long, ServiceReference<ClassLoaderWriterListener>> classLoaderWriterListeners = new HashMap<Long, ServiceReference<ClassLoaderWriterListener>>();
 
@@ -92,7 +92,7 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 	/** The bundle asking for this service instance */
 	private Bundle callerBundle;
 
-	private ServiceRegistration<?> mbeanRegistration;
+	private static ServiceRegistration<?> mbeanRegistration;
 
 	/**
 	 * Activate this component. Create the root directory.
@@ -112,8 +112,11 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 		this.callerBundle = componentContext.getUsingBundle();
 
 		classLoaderWriterListeners.clear();
-
-		this.classLoaderWriterServiceListener = new ServiceListener() {
+		if (this.classLoaderWriterServiceListener != null) {
+			componentContext.getBundleContext().removeServiceListener(classLoaderWriterServiceListener);
+			classLoaderWriterServiceListener = null;
+		}
+		classLoaderWriterServiceListener = new ServiceListener() {
 			@Override
 			public void serviceChanged(ServiceEvent event) {
 				ServiceReference<ClassLoaderWriterListener> reference = (ServiceReference<ClassLoaderWriterListener>) event
@@ -132,6 +135,10 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 		componentContext.getBundleContext().addServiceListener(classLoaderWriterServiceListener, LISTENER_FILTER);
 
 		// handle the MBean Installation
+		if (mbeanRegistration != null) {
+			mbeanRegistration.unregister();
+			mbeanRegistration = null;
+		}
 		Hashtable<String, String> jmxProps = new Hashtable<String, String>();
 		jmxProps.put("type", "ClassLoader");
 		jmxProps.put("name", "FSClassLoader");
@@ -157,6 +164,7 @@ public class FSClassLoaderProvider implements ClassLoaderWriter {
 		}
 		if (mbeanRegistration != null) {
 			mbeanRegistration.unregister();
+			mbeanRegistration = null;
 		}
 	}
 

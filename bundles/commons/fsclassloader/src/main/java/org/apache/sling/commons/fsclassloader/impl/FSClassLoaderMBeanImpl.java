@@ -22,13 +22,17 @@ package org.apache.sling.commons.fsclassloader.impl;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.sling.commons.fsclassloader.FSClassLoaderMBean;
 import org.osgi.framework.BundleContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of the FSClassLoaderMBean interface
@@ -36,6 +40,7 @@ import org.osgi.framework.BundleContext;
 public class FSClassLoaderMBeanImpl implements FSClassLoaderMBean {
 	private final BundleContext context;
 	private final FSClassLoaderProvider fsClassLoaderProvider;
+	private static final Logger log = LoggerFactory.getLogger(FSClassLoaderMBeanImpl.class);
 
 	public FSClassLoaderMBeanImpl(final FSClassLoaderProvider fsClassLoaderProvider, final BundleContext context) {
 		this.fsClassLoaderProvider = fsClassLoaderProvider;
@@ -50,9 +55,7 @@ public class FSClassLoaderMBeanImpl implements FSClassLoaderMBean {
 	 */
 	@Override
 	public int cachedScriptCount() throws IOException {
-		Map<String, ScriptFiles> scripts = new LinkedHashMap<String, ScriptFiles>();
-		FSClassLoaderWebConsole.readFiles(new File(context.getDataFile(""), "classes"), scripts);
-		return scripts.keySet().size();
+		return getScripts().size();
 	}
 
 	/*
@@ -62,13 +65,23 @@ public class FSClassLoaderMBeanImpl implements FSClassLoaderMBean {
 	 * org.apache.sling.commons.fsclassloader.FSClassLoaderMBean#cachedScripts()
 	 */
 	@Override
-	public List<String> cachedScripts() throws IOException {
-		Map<String, ScriptFiles> scripts = new LinkedHashMap<String, ScriptFiles>();
-		FSClassLoaderWebConsole.readFiles(new File(context.getDataFile(""), "classes"), scripts);
-		List<String> s = new ArrayList<String>();
-		s.addAll(scripts.keySet());
-		Collections.sort(s);
-		return s;
+	public List<String> cachedScripts() {
+		List<String> scripts = new ArrayList<String>();
+		scripts.addAll(getScripts());
+		Collections.sort(scripts);
+		return scripts;
+	}
+	
+	private Collection<String> getScripts(){
+		Collection<String> scripts = new HashSet<String>();
+		try{
+			Map<String, ScriptFiles> s = new LinkedHashMap<String, ScriptFiles>();
+			FSClassLoaderWebConsole.readFiles(new File(context.getDataFile(""), "classes"), s);
+			scripts = s.keySet();
+		}catch(Exception e){
+			log.warn("Exception retrieving scripts from FSClassLoader",e);
+		}
+		return scripts;
 	}
 
 	/*

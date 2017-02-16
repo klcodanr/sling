@@ -4,47 +4,61 @@ bold=`tput bold`
 normal=`tput sgr0`
 
 print_help () {
-	echo "Usage: build_staged_release.sh <staging-number> [-d temp-directory] [-p port]  [-t test-pattern] [-hlx]"
+	echo "Usage: build_staged_release.sh <staging-number> [-d temp-directory] [-o order-list] [-p port]  [-t test-pattern] [-hx]"
 	echo "${bold}Parameters:${normal}"
-	echo "     -h/?    Display this message."
+	echo "     -h      Display this message."
 	echo "     -d      (optional) set the download directory, default is /tmp/sling-build"
-	echo "     -l      (optional) leave the Sling instance running"
 	echo "     -o      (optional) a comma separated lists of artifact IDs to execute.  Used if the projects need to be built in a particular order"
 	echo "     -p      (optional) the port on which to start Sling"
 	echo "     -t      (optional) the tests to execute, defaults to **/integrationtest/**/*Test.java"
 	echo "     -x      (optional) skips the deployment and integration tests for this build, will not start Sling"
-	exit $STOP_CODE
+	exit 1
+}
+
+function checkrc () {
+	if [[ $rc -ne 0 ]] ; then
+		echo "Failed to execute step, exiting..."
+		checkkill
+		exit $rc
+	fi
+}
+
+function checkkill () {
+	read -p "Stop Sling Instance? (y/n) " STOP
+	if [ $STOP = "y" ]; then
+		pkill -TERM -P $PID
+		kill $PID
+		echo "Stopped Sling process $PID..."
+	else
+		echo "To stop sling, execute: pkill -TERM -P $PID && kill $PID"
+	fi
 }
 
 do_cleanup () {
 	echo "################################################################################"
 	echo "                                Cleaning Up                                     "
 	echo "################################################################################"
-	if [ -n "$PID" ] && [ "$LEAVE_RUNNING" -eq "0" ]; then
-		if ps -p $PID > /dev/null 2>&1; then
-			pkill -TERM -P $PID
-			kill $PID
-			echo "Stopped Sling process $PID..."
-		else
-			echo "Process ${PID} not running..."
-		fi
+	if [ -n "$PID" ]; then
+		checkkill
 		rm ${DOWNLOAD}/run/sling.pid
 	fi
 	echo "################################################################################"
-	exit $STOP_CODE
+}
+
+do_trap () {
+	do_cleanup
+	exit 1
 }
 
 # trap ctrl-c 
-trap do_cleanup INT
+trap do_trap INT
 
 # Initialize our variables
 DOWNLOAD="/tmp/sling-build"
-LEAVE_RUNNING=0
 NO_DEPLOY=0
 ORDER=".pom"
 PORT="8080"
 STAGING=$1
-STOP_CODE=0
 TESTS="**/integrationtest/**/*Test.java"
 
 # Make sure maven has enough memory
@@ -62,14 +76,12 @@ command -v xmllint >/dev/null 2>&1 || { echo "This script requires xmllint but i
 command -v svn >/dev/null 2>&1 || { echo "This script requires svn but it's not installed.  Aborting." >&2; exit 1; }
 command -v mvn >/dev/null 2>&1 || { echo "This script requires mvn but it's not installed.  Aborting." >&2; exit 1; }
 
-while getopts "hd:lo:p:t:x" opt; do
+while getopts "hd:o:p:t:x" opt; do
 	case "$opt" in
 	h)
 		print_help
 		;;
 	d)  DOWNLOAD=$OPTARG
-		;;
-	l)  LEAVE_RUNNING=1
 		;;
 	o)  ORDER=$OPTARG
 		;;
@@ -101,7 +113,7 @@ if [ ! -z "$PID" ] && [ ps -p $PID > /dev/null 2>&1 ]; then
 	exit 1
 fi
 
-rm -r ${DOWNLOAD}/run 2> /dev/null
+rm -rf ${DOWNLOAD}/run 2> /dev/null
 mkdir -p ${DOWNLOAD}/logs 2>/dev/null
 
 if [ ! -e "${DOWNLOAD}/staging/${STAGING}" ]; then
@@ -215,7 +227,8 @@ do
 						echo "bundle: GOOD : Successfully installed/started bundle $ARTIFACT_ID"
 					else
 						echo "bundle: BAD!! : Failed to install/start bundle $ARTIFACT_ID, response $RES"
-						STOP_CODE=1
+						do_cleanup
+						exit 1
 					fi
 				else
 					echo "Project $ARTIFACT_ID has packaging $PACKAGING, not installing..."
@@ -235,18 +248,20 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ \
 			${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
 	else 
-		echo "Updating Sling Trunk at ${DOWNLOAD}/build/integration-tests..."
+		echo "Updating Sling Integration Tests at ${DOWNLOAD}/build/integration-tests..."
 		svn up ${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
 	fi
-	mvn clean install  -Dhttp.port=${PORT} -Dtest.host=localhost -f ${DOWNLOAD}/build/integration-tests/pom.xml \
-		-Dtest=${TESTS} > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
+	echo "Running Sling Integration Tests $TESTS..."
+	mvn test -f ${DOWNLOAD}/build/integration-tests/pom.xml -Dtest=$TESTS > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
 	rc=$?
 	if [ $rc != 0 ]; then
 		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}-it.log"
-		STOP_CODE=1
+		do_cleanup
+		exit 1
 	else
 		echo "mvn: GOOD : Successfully ran integration tests"
 	fi
 fi
 
 do_cleanup
+exit 0

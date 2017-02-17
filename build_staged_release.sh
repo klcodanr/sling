@@ -218,7 +218,7 @@ do
 			echo "mvn: GOOD : Successfully built $ARTIFACT_ID"
 			if [ "$NO_DEPLOY" -eq "0" ]; then 
 				if [ "$PACKAGING" = "bundle" ]; then
-					curl -s -u admin:admin -F "action=install" -F "_noredir_=_noredir_" -F \
+					curl -s -u admin:admin -F "refreshPackages=true" -F "action=install" -F "_noredir_=_noredir_" -F \
 						"bundlefile=@${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/target/$ARTIFACT_ID-$VERSION.jar" \
 						-F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
 					sleep 30

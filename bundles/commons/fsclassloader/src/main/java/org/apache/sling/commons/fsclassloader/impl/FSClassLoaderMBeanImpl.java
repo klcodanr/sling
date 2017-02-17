@@ -78,7 +78,7 @@ public class FSClassLoaderMBeanImpl implements FSClassLoaderMBean {
 			Map<String, ScriptFiles> s = new LinkedHashMap<String, ScriptFiles>();
 			File root = new File(context.getDataFile(""), "classes");
 			if (root != null) {
-				FSClassLoaderWebConsole.readFiles(root, s);
+				FSClassLoaderWebConsole.readFiles(root, root, s);
 			}
 			scripts = s.keySet();
 		} catch (Exception e) {

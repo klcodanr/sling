@@ -9,6 +9,7 @@ print_help () {
 	echo "${bold}Parameters:${normal}"
 	echo "     -h/?    Display this message."
 	echo "     -p      (optional) the port on which to start Sling"
+	echo "     -s      (optional) stop the sling instance after completing"
 	echo "     -t      (optional) the tests to execute, defaults to **/integrationtest/**/*Test.java"
 	exit 1
 }
@@ -22,25 +23,44 @@ function checkrc () {
 }
 
 function checkkill () {
-	read -p "Stop Sling Instance? (y/n) " STOP
-	if [[ $STOP =~ ^[Yy]$ ]]; then
+	if [[ "$STOP" = "1" ]]; then
 		pkill -TERM -P $PID
-		kill $PID
 		echo "Stopped Sling process $PID..."
 	else
-		echo "To stop sling, execute: pkill -TERM -P $PID && kill $PID"
+		read -p "Stop Sling Instance? (y/n) " RES
+		if [[ $RES =~ ^[Yy]$ ]]; then
+			pkill -TERM -P $PID
+			kill $PID
+			echo "Stopped Sling process $PID..."
+		else
+			echo "To stop sling, execute: pkill -TERM -P $PID && kill $PID"
+		fi
 	fi
 }
 
+trapexit () {
+	if [ -n "$PID" ]; then
+		checkkill
+	fi
+	exit 1
+}
+
+# trap ctrl-c 
+trap do_trap INT
+
 # Initialize our variables
+STOP=0
 PORT="8080"
 TESTS="**/integrationtest/**/*Test.java"
 DIR=$(dirname $0)
 
-while getopts "hp:t:" opt; do
+while getopts "shp:t:" opt; do
 	case "$opt" in
 	h)
 		print_help
+		;;
+	s)
+		STOP=1
 		;;
 	p)  PORT=$OPTARG
 		;;

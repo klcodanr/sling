@@ -155,7 +155,7 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 		svn up ${DOWNLOAD}/run/testing/ > /dev/null 2>&1
 	fi
 	echo "Starting Sling on port ${PORT}..."
-	mvn clean install -f launchpad/testing/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
+	mvn clean install -f ${DOWNLOAD}/run/testing/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
 		${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
 	echo $! > ${DOWNLOAD}/run/sling.pid

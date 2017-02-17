@@ -117,7 +117,6 @@ for line in $lines; do
 		rc=$?
 		checkrc
 		echo "bundle: GOOD : Successfully installed $bundle"
-		read -rsp $'Press enter to continue...\n'
 	fi
 done
 

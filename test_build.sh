@@ -46,7 +46,7 @@ trapexit () {
 }
 
 # trap ctrl-c 
-trap do_trap INT
+trap trapexit INT
 
 # Initialize our variables
 STOP=0

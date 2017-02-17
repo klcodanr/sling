@@ -38,7 +38,7 @@ public interface FSClassLoaderMBean {
 	 * 
 	 * @return the file system classloader root
 	 */
-	String fsClassLoaderRoot();
+	String getFSClassLoaderRoot();
 
 	/**
 	 * Get the total count of scripts in the FSClassLoader cache
@@ -46,7 +46,7 @@ public interface FSClassLoaderMBean {
 	 * @return the total number of scripts
 	 * @throws IOException
 	 */
-	int cachedScriptCount() throws IOException;
+	int getCachedScriptCount() throws IOException;
 
 	/**
 	 * Gets the scripts in the FSClassLoaderCache
@@ -54,6 +54,6 @@ public interface FSClassLoaderMBean {
 	 * @return the scripts from the FSClassLoaderCache
 	 * @throws IOException
 	 */
-	List<String> cachedScripts() throws IOException;
+	List<String> getCachedScripts() throws IOException;
 
 }

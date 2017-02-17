@@ -51,35 +51,38 @@ public class FSClassLoaderMBeanImpl implements FSClassLoaderMBean {
 	 * (non-Javadoc)
 	 * 
 	 * @see org.apache.sling.commons.fsclassloader.FSClassLoaderMBean#
-	 * cachedScriptCount()
+	 * getCachedScriptCount()
 	 */
 	@Override
-	public int cachedScriptCount() throws IOException {
+	public int getCachedScriptCount() throws IOException {
 		return getScripts().size();
 	}
 
 	/*
 	 * (non-Javadoc)
 	 * 
-	 * @see
-	 * org.apache.sling.commons.fsclassloader.FSClassLoaderMBean#cachedScripts()
+	 * @see org.apache.sling.commons.fsclassloader.FSClassLoaderMBean#
+	 * getCachedScripts()
 	 */
 	@Override
-	public List<String> cachedScripts() {
+	public List<String> getCachedScripts() {
 		List<String> scripts = new ArrayList<String>();
 		scripts.addAll(getScripts());
 		Collections.sort(scripts);
 		return scripts;
 	}
-	
-	private Collection<String> getScripts(){
+
+	private Collection<String> getScripts() {
 		Collection<String> scripts = new HashSet<String>();
-		try{
+		try {
 			Map<String, ScriptFiles> s = new LinkedHashMap<String, ScriptFiles>();
-			FSClassLoaderWebConsole.readFiles(new File(context.getDataFile(""), "classes"), s);
+			File root = new File(context.getDataFile(""), "classes");
+			if (root != null) {
+				FSClassLoaderWebConsole.readFiles(root, s);
+			}
 			scripts = s.keySet();
-		}catch(Exception e){
-			log.warn("Exception retrieving scripts from FSClassLoader",e);
+		} catch (Exception e) {
+			log.warn("Exception retrieving scripts from FSClassLoader", e);
 		}
 		return scripts;
 	}
@@ -99,10 +102,10 @@ public class FSClassLoaderMBeanImpl implements FSClassLoaderMBean {
 	 * (non-Javadoc)
 	 * 
 	 * @see org.apache.sling.commons.fsclassloader.FSClassLoaderMBean#
-	 * fsClassLoaderRoot()
+	 * getFSClassLoaderRoot()
 	 */
 	@Override
-	public String fsClassLoaderRoot() {
+	public String getFSClassLoaderRoot() {
 		return new File(context.getDataFile(""), "classes").getAbsolutePath();
 	}
 

@@ -24,13 +24,18 @@ function checkrc () {
 }
 
 function checkkill () {
-	read -p "Stop Sling Instance? (y/n) " STOP
-	if [ $STOP = "y" ]; then
+	if [[ "$STOP" = "1" ]]; then
 		pkill -TERM -P $PID
-		kill $PID
 		echo "Stopped Sling process $PID..."
 	else
-		echo "To stop sling, execute: pkill -TERM -P $PID && kill $PID"
+		read -p "Stop Sling Instance? (y/n) " RES
+		if [[ $RES =~ ^[Yy]$ ]]; then
+			pkill -TERM -P $PID
+			kill $PID
+			echo "Stopped Sling process $PID..."
+		else
+			echo "To stop sling, execute: pkill -TERM -P $PID && kill $PID"
+		fi
 	fi
 }
 
@@ -59,6 +64,7 @@ NO_DEPLOY=0
 ORDER=".pom"
 PORT="8080"
 STAGING=$1
+STOP=0
 TESTS="**/integrationtest/**/*Test.java"
 
 # Make sure maven has enough memory
@@ -76,7 +82,7 @@ command -v xmllint >/dev/null 2>&1 || { echo "This script requires xmllint but i
 command -v svn >/dev/null 2>&1 || { echo "This script requires svn but it's not installed.  Aborting." >&2; exit 1; }
 command -v mvn >/dev/null 2>&1 || { echo "This script requires mvn but it's not installed.  Aborting." >&2; exit 1; }
 
-while getopts "hd:o:p:t:x" opt; do
+while getopts "hsd:o:p:t:x" opt; do
 	case "$opt" in
 	h)
 		print_help
@@ -84,6 +90,8 @@ while getopts "hd:o:p:t:x" opt; do
 	d)  DOWNLOAD=$OPTARG
 		;;
 	o)  ORDER=$OPTARG
+		;;
+	s)  STOP=1
 		;;
 	p)  PORT=$OPTARG
 		;;
@@ -155,7 +163,7 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 		svn up ${DOWNLOAD}/run/testing/ > /dev/null 2>&1
 	fi
 	echo "Starting Sling on port ${PORT}..."
-	mvn clean install -f launchpad/testing/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
+	mvn clean install -f ${DOWNLOAD}/run/testing/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
 		${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
 	echo $! > ${DOWNLOAD}/run/sling.pid
@@ -218,7 +226,7 @@ do
 			echo "mvn: GOOD : Successfully built $ARTIFACT_ID"
 			if [ "$NO_DEPLOY" -eq "0" ]; then 
 				if [ "$PACKAGING" = "bundle" ]; then
-					curl -s -u admin:admin -F "action=install" -F "_noredir_=_noredir_" -F \
+					curl -s -u admin:admin -F "refreshPackages=true" -F "action=install" -F "_noredir_=_noredir_" -F \
 						"bundlefile=@${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/target/$ARTIFACT_ID-$VERSION.jar" \
 						-F "bundlestart=start" http://localhost:${PORT}/system/console/bundles
 					sleep 30

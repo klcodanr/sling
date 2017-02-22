@@ -122,7 +122,7 @@ if [ ! -z "$PID" ] && [ ps -p $PID > /dev/null 2>&1 ]; then
 fi
 
 rm -rf ${DOWNLOAD}/run 2> /dev/null
-mkdir -p ${DOWNLOAD}/logs 2>/dev/null
+mkdir -p ${DOWNLOAD}/logs/${STAGING} 2>/dev/null
 
 if [ ! -e "${DOWNLOAD}/staging/${STAGING}" ]; then
 	echo "################################################################################"
@@ -152,18 +152,13 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "                            SETTING UP SLING INSTANCE                           "
 	echo "################################################################################"
 	mkdir -p ${DOWNLOAD}/run
+	rm -rf ${DOWNLOAD}/run/*
 	
-	if [ ! -e "${DOWNLOAD}/run/testing" ]; then
-		echo "Downloading Sling Testing Project to ${DOWNLOAD}/run/testing..."
-		mkdir -p ${DOWNLOAD}/run/testing
-		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/testing/ \
-			${DOWNLOAD}/run/testing/ > /dev/null 2>&1
-	else 
-		echo "Updating Sling Trunk at ${DOWNLOAD}/run/testing..."
-		svn up ${DOWNLOAD}/run/testing/ > /dev/null 2>&1
-	fi
+	echo "Downloading Sling Testing Project to ${DOWNLOAD}/run..."
+	svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/testing/ \
+			${DOWNLOAD}/run > /dev/null 2>&1
 	echo "Starting Sling on port ${PORT}..."
-	mvn clean install -f ${DOWNLOAD}/run/testing/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
+	mvn clean install -f ${DOWNLOAD}/run/pom.xml -Dlaunchpad.keep.running=true -Dhttp.port=$PORT -Ddebug=true > \
 		${DOWNLOAD}/logs/sling-start.log 2>&1 &
 	PID=$!
 	echo $! > ${DOWNLOAD}/run/sling.pid
@@ -214,12 +209,12 @@ do
 		echo "Running build for $TAG..."
 		mkdir -p ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID
 		echo "Exporting tag $TAG to ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
-		svn export --force $TAG ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID > ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
+		svn export --force $TAG ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID > ${DOWNLOAD}/logs/${STAGING}/$ARTIFACT_ID-build.log 2>&1
 		echo "Building tag ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID..."
-		mvn clean install -f ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/pom.xml >> ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log 2>&1
+		mvn clean install -f ${DOWNLOAD}/build/${STAGING}/$ARTIFACT_ID/pom.xml >> ${DOWNLOAD}/logs/${STAGING}/$ARTIFACT_ID-build.log 2>&1
 		rc=$?
 		if [ $rc != 0 ] ; then
-			echo "mvn: BAD!! : Failed to build $ARTIFACT_ID, see ${DOWNLOAD}/logs/${STAGING}-$ARTIFACT_ID-build.log"
+			echo "mvn: BAD!! : Failed to build $ARTIFACT_ID, see ${DOWNLOAD}/logs/${STAGING}/$ARTIFACT_ID-build.log"
 			do_cleanup
 			exit 1
 		else 
@@ -250,20 +245,16 @@ if [ "$NO_DEPLOY" -eq "0" ]; then
 	echo "################################################################################"
 	echo "                             CHECK INTEGRATION TESTS                            "
 	echo "################################################################################"
-	if [ ! -e "${DOWNLOAD}/build/integration-tests" ]; then
-		echo "Downloading Sling Integration Tests to ${DOWNLOAD}/build/integration-tests..."
-		mkdir -p ${DOWNLOAD}/build/integration-tests
-		svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ \
-			${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
-	else 
-		echo "Updating Sling Integration Tests at ${DOWNLOAD}/build/integration-tests..."
-		svn up ${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
-	fi
+	rm -rf ${DOWNLOAD}/build/integration-tests
+	mkdir -p ${DOWNLOAD}/build/integration-tests
+	echo "Downloading Sling Integration Tests to ${DOWNLOAD}/build/integration-tests..."	
+	svn co http://svn.apache.org/repos/asf/sling/trunk/launchpad/integration-tests/ \
+		${DOWNLOAD}/build/integration-tests/ > /dev/null 2>&1
 	echo "Running Sling Integration Tests $TESTS..."
-	mvn test -f ${DOWNLOAD}/build/integration-tests/pom.xml -Dtest=$TESTS > ${DOWNLOAD}/logs/${STAGING}-it.log 2>&1
+	mvn test -f ${DOWNLOAD}/build/integration-tests/pom.xml -Dtest=$TESTS > ${DOWNLOAD}/logs/${STAGING}/integration-tests.log 2>&1
 	rc=$?
 	if [ $rc != 0 ]; then
-		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}-it.log"
+		echo "mvn: BAD!! : Failed to run integration tests, see ${DOWNLOAD}/logs/${STAGING}/integration-tests.log"
 		do_cleanup
 		exit 1
 	else

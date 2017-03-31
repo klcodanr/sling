@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>26</version>
+        <version>30</version>
         <relativePath />
     </parent>
 
@@ -86,24 +86,12 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.apache.felix.scr.annotations</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>osgi.core</artifactId>
-            <version>6.0.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>osgi.annotation</artifactId>
-            <version>6.0.1</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
@@ -111,10 +99,14 @@
             <version>2.0.1</version>
         </dependency>
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <!-- Use the version being used in Sling -->
-            <version>15.0</version>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.scr.annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>biz.aQute.bnd</groupId>
+            <artifactId>biz.aQute.bndlib</artifactId>
+            <scope>provided</scope>
         </dependency>
       <!-- Testing -->
         <dependency>

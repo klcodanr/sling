@@ -17,39 +17,36 @@
 package org.apache.sling.xss.impl;
 
 import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
-import javax.xml.parsers.ParserConfigurationException;
+import javax.json.Json;
+import javax.json.JsonReaderFactory;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.resource.ResourceResolver;
-import org.apache.sling.commons.json.JSONArray;
-import org.apache.sling.commons.json.JSONException;
-import org.apache.sling.commons.json.JSONObject;
 import org.apache.sling.xss.ProtectionContext;
 import org.apache.sling.xss.XSSAPI;
 import org.apache.sling.xss.XSSFilter;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
 import org.owasp.encoder.Encode;
 import org.owasp.esapi.ESAPI;
 import org.owasp.esapi.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
-import org.xml.sax.SAXNotRecognizedException;
-import org.xml.sax.SAXNotSupportedException;
 import org.xml.sax.XMLReader;
 
 @Component
-@Service(value = XSSAPI.class)
 public class XSSAPIImpl implements XSSAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger(XSSAPIImpl.class);
 
@@ -61,9 +58,10 @@ public class XSSAPIImpl implements XSSAPI {
     private static final Pattern PATTERN_AUTO_DIMENSION = Pattern.compile("['\"]?auto['\"]?");
 
     private SAXParserFactory factory;
+    
+    private volatile JsonReaderFactory jsonReaderFactory;
 
     @Activate
-    @SuppressWarnings("unused")
     protected void activate() {
         factory = SAXParserFactory.newInstance();
         factory.setValidating(false);
@@ -75,12 +73,15 @@ public class XSSAPIImpl implements XSSAPI {
         } catch (Exception e) {
             LOGGER.error("SAX parser configuration error: " + e.getMessage(), e);
         }
+        Map<String, Object> config = new HashMap<>();
+        config.put("org.apache.johnzon.supports-comments", true);
+        jsonReaderFactory = Json.createReaderFactory(config);
     }
 
     @Deactivate
-    @SuppressWarnings("unused")
     protected void deactivate() {
         factory = null;
+        jsonReaderFactory = null;
     }
 
     // =============================================================================================
@@ -160,9 +161,6 @@ public class XSSAPIImpl implements XSSAPI {
         // fall through to default if empty, null, or validation failure
         return defaultValue;
     }
-
-    private static final String LINK_PREFIX = "<a href=\"";
-    private static final String LINK_SUFFIX = "\"></a>";
 
     private static final String MANGLE_NAMESPACE_OUT_SUFFIX = ":";
 
@@ -358,16 +356,18 @@ public class XSSAPIImpl implements XSSAPI {
         int straightIx = json.indexOf("[");
         if (curlyIx >= 0 && (curlyIx < straightIx || straightIx < 0)) {
             try {
-                JSONObject obj = new JSONObject(json);
-                return obj.toString();
-            } catch (JSONException e) {
+                StringWriter output = new StringWriter();
+                Json.createGenerator(output).write(jsonReaderFactory.createReader(new StringReader(json)).readObject()).close();
+                return output.getBuffer().toString();
+            } catch (Exception e) {
                 LOGGER.debug("JSON validation failed: " + e.getMessage(), e);
             }
         } else {
             try {
-                JSONArray arr = new JSONArray(json);
-                return arr.toString();
-            } catch (JSONException e) {
+                StringWriter output = new StringWriter();
+                Json.createGenerator(output).write(jsonReaderFactory.createReader(new StringReader(json)).readArray()).close();
+                return output.getBuffer().toString();
+            } catch (Exception e) {
                 LOGGER.debug("JSON validation failed: " + e.getMessage(), e);
             }
         }

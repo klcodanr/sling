@@ -20,7 +20,7 @@
 [feature name=oak]
 
 [variables]
-    oak.version=1.6.0
+    oak.version=1.6.1
 
 # The segment node store is used via a configuration
 [artifacts startLevel=10]
@@ -34,7 +34,7 @@
     org.apache.jackrabbit/oak-jcr/${oak.version}
 
 [artifacts startLevel=15 runModes=oak_tar]
-    org.apache.jackrabbit/oak-segment/${oak.version}
+    org.apache.jackrabbit/oak-segment-tar/${oak.version}
 
 [artifacts startLevel=15 runModes=oak_mongo]
     org.mongodb/mongo-java-driver/3.4.1
@@ -43,7 +43,7 @@
 # start the Oak server instance after all components have been configured
 # and started to avoid restarting that component ( see SLING-4556 )
 [artifacts startLevel=16]
-    org.apache.sling/org.apache.sling.jcr.oak.server/1.1.3-SNAPSHOT
+    org.apache.sling/org.apache.sling.jcr.oak.server/1.1.4
 
 [configurations]
   org.apache.felix.jaas.Configuration.factory-GuestLoginModule
@@ -82,7 +82,7 @@
     groupPrivilegeNames=["jcr:read"]
 
 [configurations runModes=oak_tar]
-  org.apache.jackrabbit.oak.plugins.segment.SegmentNodeStoreService
+  org.apache.jackrabbit.oak.segment.SegmentNodeStoreService
     name="Default\ NodeStore"
 
 [configurations runModes=oak_mongo]

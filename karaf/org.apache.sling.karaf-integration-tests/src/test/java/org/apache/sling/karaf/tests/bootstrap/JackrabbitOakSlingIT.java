@@ -19,7 +19,6 @@
 package org.apache.sling.karaf.tests.bootstrap;
 
 import org.apache.sling.karaf.testing.KarafTestSupport;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.ops4j.pax.exam.Configuration;
@@ -68,13 +67,6 @@ public class JackrabbitOakSlingIT extends KarafTestSupport {
     @Test
     public void testOrgApacheJackrabbitOakJcr() {
         final Bundle bundle = findBundle("org.apache.jackrabbit.oak-jcr");
-        assertNotNull(bundle);
-        assertEquals(Bundle.ACTIVE, bundle.getState());
-    }
-
-    @Test
-    public void testOrgApacheJackrabbitOakLucene() {
-        final Bundle bundle = findBundle("org.apache.jackrabbit.oak-lucene");
         assertNotNull(bundle);
         assertEquals(Bundle.ACTIVE, bundle.getState());
     }

@@ -78,6 +78,11 @@ import org.slf4j.LoggerFactory;
  */
 @Component(service = {javax.script.ScriptEngineFactory.class,ResourceChangeListener.class,ClassLoaderWriterListener.class},
            property = {
+                   "extensions=jsp",
+                   "extensions=jspf",
+                   "extensions=jspx",
+                   "names=jsp",
+                   "names=JSP",
                    Constants.SERVICE_VENDOR + "=The Apache Software Foundation",
                    Constants.SERVICE_DESCRIPTION + "=JSP Script Handler",
                    ResourceChangeListener.CHANGES + "=CHANGED",
@@ -104,7 +109,7 @@ public class JspScriptEngineFactory
     public @interface Config {
 
         @AttributeDefinition(name = "Target Version",
-                description = "The taret JVM version for the compiled classes. If " +
+                description = "The target JVM version for the compiled classes. If " +
                               "left empty, the default version, 1.6., is used. If the value \"auto\" is used, the " +
                               "current vm version will be used.")
         String jasper_compilerTargetVM() default JspServletOptions.AUTOMATIC_VERSION;

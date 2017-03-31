@@ -126,10 +126,10 @@
         <module>bundles/jcr/api</module>
         <module>bundles/jcr/base</module>
         <module>bundles/jcr/contentloader</module>
+        <module>bundles/jcr/contentparser</module>
         <!--
         <module>bundles/jcr/jackrabbit-base</module>
         -->
-        <module>bundles/jcr/jackrabbit-server</module>
         <module>bundles/jcr/jackrabbit-usermanager</module>
         <module>bundles/jcr/jackrabbit-accessmanager</module>
         <module>bundles/jcr/jcr-wrapper</module>
@@ -146,13 +146,14 @@
         <module>bundles/servlets/resolver</module>
         <module>bundles/servlets/get</module>
         <module>bundles/servlets/post</module>
-        <module>bundles/servlets/compat</module>
 
         <!-- Scripting Support -->
         <module>bundles/scripting/api</module>
         <module>bundles/scripting/core</module>
+        <module>bundles/scripting/el-api</module>
         <module>bundles/scripting/javascript</module>
         <module>bundles/scripting/jsp</module>
+        <module>bundles/scripting/jsp-api</module>
         <module>bundles/scripting/jsp-taglib</module>
         <module>bundles/scripting/jsp-jstl</module>
         <module>bundles/scripting/sightly</module>
@@ -169,7 +170,8 @@
         <module>bundles/extensions/discovery/oak</module>
         <module>bundles/extensions/discovery/support</module>
         <module>bundles/extensions/discovery/standalone</module>
-        <module>bundles/extensions/event</module>
+        <module>bundles/extensions/event/api</module>
+        <module>bundles/extensions/event/resource</module>
         <module>bundles/extensions/feature-flags</module>
         <module>bundles/extensions/fsresource</module>
         <module>bundles/extensions/javax.activation</module>

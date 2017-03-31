@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.Nonnull;
 
-import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections4.BidiMap;
 import org.apache.sling.api.resource.LoginException;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.resource.ResourceResolverFactory;
@@ -73,21 +73,24 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
     /**
      * Thread local holding the resource resolver stack
      */
-    private ThreadLocal<Stack<WeakReference<ResourceResolver>>> resolverStackHolder = new ThreadLocal<Stack<WeakReference<ResourceResolver>>>();
+    private ThreadLocal<Stack<WeakReference<ResourceResolver>>> resolverStackHolder = new ThreadLocal<>();
 
     /** Flag indicating whether this factory is still active. */
     private final AtomicBoolean isActive = new AtomicBoolean(true);
 
     /** The reference queue to handle disposing of resource resolver instances. */
-    private final ReferenceQueue<ResourceResolver> resolverReferenceQueue = new ReferenceQueue<ResourceResolver>();
+    private final ReferenceQueue<ResourceResolver> resolverReferenceQueue = new ReferenceQueue<>();
 
     /** Map of the ResourceResolverControl's hash code to the references to open resource resolver instances. */
-    private final Map<Integer, ResolverReference> refs = new ConcurrentHashMap<Integer, ResolverReference>();
+    private final Map<Integer, ResolverReference> refs = new ConcurrentHashMap<>();
 
     /** Background thread handling disposing of resource resolver instances. */
     private final Thread refQueueThread;
 
     private boolean logUnclosedResolvers;
+
+    private final Object optionalNamespaceMangler;
+
 
     /**
      * Create a new common resource resolver factory.
@@ -111,6 +114,17 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         };
         this.refQueueThread.setDaemon(true);
         this.refQueueThread.start();
+
+        // try create namespace mangler
+        Object mangler = null;
+        if ( this.isMangleNamespacePrefixes() ) {
+            try {
+                mangler = new JcrNamespaceMangler();
+            } catch ( final Throwable t) {
+                LOG.info("Unable to create JCR namespace mangler: {}", t.getMessage());
+            }
+        }
+        this.optionalNamespaceMangler = mangler;
     }
 
     // ---------- Resource Resolver Factory ------------------------------------
@@ -125,7 +139,7 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         checkIsLive();
 
         // create a copy of the passed authentication info as we modify the map
-        final Map<String, Object> authenticationInfo = new HashMap<String, Object>();
+        final Map<String, Object> authenticationInfo = new HashMap<>();
         authenticationInfo.put(ResourceProvider.AUTH_ADMIN, Boolean.TRUE);
         if ( passedAuthenticationInfo != null ) {
             authenticationInfo.putAll(passedAuthenticationInfo);
@@ -147,7 +161,7 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         checkIsLive();
 
         // create a copy of the passed authentication info as we modify the map
-        final Map<String, Object> authenticationInfo = new HashMap<String, Object>();
+        final Map<String, Object> authenticationInfo = new HashMap<>();
         if ( passedAuthenticationInfo != null ) {
             authenticationInfo.putAll(passedAuthenticationInfo);
             // make sure there is no leaking of service bundle and info props
@@ -158,10 +172,10 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         final ResourceResolver result = getResourceResolverInternal(authenticationInfo, false);
         Stack<WeakReference<ResourceResolver>> resolverStack = resolverStackHolder.get();
         if ( resolverStack == null ) {
-            resolverStack = new Stack<WeakReference<ResourceResolver>>();
+            resolverStack = new Stack<>();
             resolverStackHolder.set(resolverStack);
         }
-        resolverStack.push(new WeakReference<ResourceResolver>(result));
+        resolverStack.push(new WeakReference<>(result));
         return result;
     }
 
@@ -317,7 +331,7 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         resolverStackHolder = null;
 
         // copy and clear map before closing the remaining references
-        final Collection<ResolverReference> references = new ArrayList<ResolverReference>(refs.values());
+        final Collection<ResolverReference> references = new ArrayList<>(refs.values());
         refs.clear();
         for(final ResolverReference ref : references) {
             ref.close();
@@ -334,6 +348,10 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
 
     public boolean isMangleNamespacePrefixes() {
         return this.activator.isMangleNamespacePrefixes();
+    }
+
+    public Object getNamespaceMangler() {
+        return this.optionalNamespaceMangler;
     }
 
     @Override
@@ -419,7 +437,7 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         if ( includes == null && excludes == null ) {
             return null;
         }
-        final List<VanityPathConfig> configs = new ArrayList<VanityPathConfig>();
+        final List<VanityPathConfig> configs = new ArrayList<>();
         if ( includes != null ) {
             for(final String val : includes) {
                 configs.add(new VanityPathConfig(val, false));
@@ -449,7 +467,8 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         return activator.getResourceProviderTracker();
     }
 
-    public Map<String, Object> getServiceUserAuthenticationInfo(final String subServiceName) 
+    @Override
+    public Map<String, Object> getServiceUserAuthenticationInfo(final String subServiceName)
     throws LoginException {
         // get an administrative resource resolver
         // Ensure a mapped user name: If no user is defined for a bundle
@@ -469,7 +488,7 @@ public class CommonResourceResolverFactoryImpl implements ResourceResolverFactor
         authenticationInfo.put(ResourceResolverFactory.SUBSERVICE, subServiceName);
         authenticationInfo.put(ResourceResolverFactory.USER, userName);
         authenticationInfo.put(ResourceProvider.AUTH_SERVICE_BUNDLE, bundle);
-        
+
         return authenticationInfo;
     }
 

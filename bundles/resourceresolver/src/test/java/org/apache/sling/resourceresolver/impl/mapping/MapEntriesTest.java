@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
@@ -37,20 +38,27 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.resource.ResourceUtil;
 import org.apache.sling.api.resource.ValueMap;
+import org.apache.sling.api.resource.observation.ResourceChange;
+import org.apache.sling.api.resource.observation.ResourceChange.ChangeType;
 import org.apache.sling.api.resource.path.Path;
 import org.apache.sling.api.wrappers.ValueMapDecorator;
 import org.apache.sling.resourceresolver.impl.ResourceResolverImpl;
@@ -59,6 +67,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -94,7 +103,7 @@ public class MapEntriesTest {
     public void setup() throws Exception {
         MockitoAnnotations.initMocks(this);
 
-        final List<VanityPathConfig> configs = new ArrayList<MapConfigurationProvider.VanityPathConfig>();
+        final List<VanityPathConfig> configs = new ArrayList<>();
         configs.add(new VanityPathConfig("/libs/", false));
         configs.add(new VanityPathConfig("/libs/denied", true));
         configs.add(new VanityPathConfig("/foo/", false));
@@ -211,7 +220,7 @@ public class MapEntriesTest {
 
         when(resourceResolverFactory.getDefaultVanityPathRedirectStatus()).thenReturn(DEFAULT_VANITY_STATUS);
 
-        final List<Resource> resources = new ArrayList<Resource>();
+        final List<Resource> resources = new ArrayList<>();
 
         Resource justVanityPath = mock(Resource.class, "justVanityPath");
         when(justVanityPath.getPath()).thenReturn("/justVanityPath");
@@ -290,8 +299,80 @@ public class MapEntriesTest {
 
     }
 
+    @Test
+    public void test_vanity_path_updates() throws Exception {
+        Resource parent = mock(Resource.class, "parent");
+        when(parent.getPath()).thenReturn("/foo/parent");
+        when(parent.getName()).thenReturn("parent");
+        when(parent.getValueMap()).thenReturn(new ValueMapDecorator(Collections.<String, Object>emptyMap()));
+        when(resourceResolver.getResource(parent.getPath())).thenReturn(parent);
+
+        Resource child = mock(Resource.class, "jcrcontent");
+        when(child.getPath()).thenReturn("/foo/parent/jcr:content");
+        when(child.getName()).thenReturn("jcr:content");
+        when(child.getValueMap()).thenReturn(buildValueMap("sling:vanityPath", "/target/found"));
+        when(child.getParent()).thenReturn(parent);
+        when(parent.getChild(child.getName())).thenReturn(child);
+        when(resourceResolver.getResource(child.getPath())).thenReturn(child);
+
+        when(resourceResolver.findResources(anyString(), eq("sql"))).thenAnswer(new Answer<Iterator<Resource>>() {
+
+            @Override
+            public Iterator<Resource> answer(InvocationOnMock invocation) throws Throwable {
+                return Collections.<Resource> emptySet().iterator();
+            }
+        });
+
+        mapEntries.doInit();
+        mapEntries.initializeVanityPaths();
+
+        // map entries should have no alias atm
+        assertTrue( mapEntries.getResolveMaps().isEmpty());
+
+        // add parent
+        mapEntries.onChange(Arrays.asList(new ResourceChange(ChangeType.ADDED, parent.getPath(), false)));
+        assertTrue( mapEntries.getResolveMaps().isEmpty());
+
+        // add child
+        mapEntries.onChange(Arrays.asList(new ResourceChange(ChangeType.ADDED, child.getPath(), false)));
+
+        // two entries for the vanity path
+        List<MapEntry> entries = mapEntries.getResolveMaps();
+        assertEquals(2, entries.size());
+        for (MapEntry entry : entries) {
+            assertTrue(entry.getPattern().contains("/target/found"));
+        }
+
+        // update parent - no change
+        mapEntries.onChange(Arrays.asList(new ResourceChange(ChangeType.CHANGED, parent.getPath(), false)));
+        entries = mapEntries.getResolveMaps();
+        assertEquals(2, entries.size());
+        for (MapEntry entry : entries) {
+            assertTrue(entry.getPattern().contains("/target/found"));
+        }
+
+        // update child - no change
+        mapEntries.onChange(Arrays.asList(new ResourceChange(ChangeType.CHANGED, child.getPath(), false)));
+        entries = mapEntries.getResolveMaps();
+        assertEquals(2, entries.size());
+        for (MapEntry entry : entries) {
+            assertTrue(entry.getPattern().contains("/target/found"));
+        }
+
+        // remove child - empty again
+        when(resourceResolver.getResource(child.getPath())).thenReturn(null);
+        when(parent.getChild(child.getName())).thenReturn(null);
+        mapEntries.onChange(Arrays.asList(new ResourceChange(ChangeType.REMOVED, child.getPath(), false)));
+        assertTrue( mapEntries.getResolveMaps().isEmpty());
+
+        // remove parent - still empty
+        when(resourceResolver.getResource(parent.getPath())).thenReturn(null);
+        mapEntries.onChange(Arrays.asList(new ResourceChange(ChangeType.REMOVED, parent.getPath(), false)));
+        assertTrue( mapEntries.getResolveMaps().isEmpty());
+    }
+
     private ValueMap buildValueMap(Object... string) {
-        final Map<String, Object> data = new HashMap<String, Object>();
+        final Map<String, Object> data = new HashMap<>();
         for (int i = 0; i < string.length; i = i + 2) {
             data.put((String) string[i], string[i+1]);
         }
@@ -311,7 +392,7 @@ public class MapEntriesTest {
         final String[] validPaths = {"/libs/somewhere", "/libs/a/b", "/foo/a", "/baa/a"};
         final String[] invalidPaths = {"/libs/denied/a", "/libs/denied/b/c", "/nowhere"};
 
-        final List<Resource> resources = new ArrayList<Resource>();
+        final List<Resource> resources = new ArrayList<>();
         for(final String val : validPaths) {
             resources.add(getVanityPathResource(val));
         }
@@ -339,7 +420,7 @@ public class MapEntriesTest {
         // each valid resource results in 2 entries
         assertEquals(validPaths.length * 2, entries.size());
 
-        final Set<String> resultSet = new HashSet<String>();
+        final Set<String> resultSet = new HashSet<>();
         for(final String p : validPaths) {
             resultSet.add(p + "$1");
             resultSet.add(p + ".html");
@@ -1419,18 +1500,12 @@ public class MapEntriesTest {
 
     @Test
     public void test_isValidVanityPath() throws Exception {
-        Method method = MapEntries.class.getDeclaredMethod("isValidVanityPath", Resource.class);
+        Method method = MapEntries.class.getDeclaredMethod("isValidVanityPath", String.class);
         method.setAccessible(true);
 
-        final Resource resource = mock(Resource.class);
-        when(resource.getPath()).thenReturn("/jcr:system/node");
+        assertFalse((Boolean)method.invoke(mapEntries, "/jcr:system/node"));
 
-        assertFalse((Boolean)method.invoke(mapEntries, resource));
-
-        when(resource.getPath()).thenReturn("/justVanityPath");
-        when(resource.getValueMap()).thenReturn(mock(ValueMap.class));
-
-        assertTrue((Boolean)method.invoke(mapEntries, resource));
+        assertTrue((Boolean)method.invoke(mapEntries, "/justVanityPath"));
     }
 
     @Test
@@ -1796,7 +1871,7 @@ public class MapEntriesTest {
 
         when(this.resourceResolverFactory.getMaxCachedVanityPathEntries()).thenReturn(2L);
 
-        ArrayList<DataFuture> list = new ArrayList<DataFuture>();
+        ArrayList<DataFuture> list = new ArrayList<>();
         for (int i =0;i<10;i++) {
             list.add(createDataFuture(pool, mapEntries));
 
@@ -1806,6 +1881,83 @@ public class MapEntriesTest {
            df.future.get();
         }
 
+    }
+
+    // tests SLING-6542
+    @Test
+    public void sessionConcurrency() throws Exception {
+        final Method addResource = MapEntries.class.getDeclaredMethod("addResource", String.class, AtomicBoolean.class);
+        addResource.setAccessible(true);
+        final Method updateResource = MapEntries.class.getDeclaredMethod("updateResource", String.class, AtomicBoolean.class);
+        updateResource.setAccessible(true);
+        final Method handleConfigurationUpdate = MapEntries.class.getDeclaredMethod("handleConfigurationUpdate",
+                String.class, AtomicBoolean.class, AtomicBoolean.class, boolean.class);
+        handleConfigurationUpdate.setAccessible(true);
+
+        final Semaphore sessionLock = new Semaphore(1);
+        // simulate somewhat slow (1ms) session operations that use locking
+        // to determine that they are using the session exclusively.
+        // if that lock mechanism detects concurrent access we fail
+        Mockito.doAnswer(new Answer<Void>() {
+
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                simulateSomewhatSlowSessionOperation(sessionLock);
+                return null;
+            }
+
+        }).when(resourceResolver).refresh();
+        Mockito.doAnswer(new Answer<Resource>() {
+
+            @Override
+            public Resource answer(InvocationOnMock invocation) throws Throwable {
+                simulateSomewhatSlowSessionOperation(sessionLock);
+                return null;
+            }
+
+        }).when(resourceResolver).getResource(any(String.class));
+
+        when(resourceResolverFactory.isMapConfiguration(any(String.class))).thenReturn(true);
+
+        final AtomicInteger failureCnt = new AtomicInteger(0);
+        final List<Exception> exceptions = new LinkedList<>();
+        final Semaphore done = new Semaphore(0);
+        final int NUM_THREADS = 30;
+        final Random random = new Random(12321);
+        for(int i=0; i<NUM_THREADS; i++) {
+            final int randomWait = random.nextInt(10);
+            Runnable r = new Runnable() {
+
+                @Override
+                public void run() {
+                    try{
+                        Thread.sleep(randomWait);
+                        for(int i=0; i<3; i++) {
+                            addResource.invoke(mapEntries, "/node", new AtomicBoolean());
+                            updateResource.invoke(mapEntries, "/node", new AtomicBoolean());
+                            handleConfigurationUpdate.invoke(mapEntries, "/node", new AtomicBoolean(), new AtomicBoolean(), false);
+                        }
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                        synchronized(exceptions) {
+                            exceptions.add(e);
+                        }
+                        failureCnt.incrementAndGet();
+                    } finally {
+                        done.release();
+                    }
+                }
+            };
+            Thread th = new Thread(r);
+            th.setDaemon(true);
+            th.start();
+        }
+        assertTrue("threads did not finish in time", done.tryAcquire(NUM_THREADS, 30, TimeUnit.SECONDS));
+        if (failureCnt.get() != 0) {
+            synchronized(exceptions) {
+                throw new AssertionError("exceptions encountered (" + failureCnt.get() + "). First exception: ", exceptions.get(0));
+            }
+        }
     }
 
     // -------------------------- private methods ----------
@@ -1820,6 +1972,17 @@ public class MapEntriesTest {
         return new DataFuture(future);
     }
 
+    private void simulateSomewhatSlowSessionOperation(final Semaphore sessionLock) throws InterruptedException {
+        if (!sessionLock.tryAcquire()) {
+            fail("concurrent session access detected");
+        }
+        try{
+            Thread.sleep(1);
+        } finally {
+            sessionLock.release();
+        }
+    }
+
     // -------------------------- inner classes ------------
 
     private static class DataFuture {
@@ -1830,4 +1993,5 @@ public class MapEntriesTest {
             this.future = future;
         }
     }
+
 }

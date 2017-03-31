@@ -18,11 +18,10 @@
  */
 package org.apache.sling.maven.bundlesupport;
 
-import java.io.File;
-import java.util.Iterator;
-import java.util.Map;
+import static org.apache.sling.maven.bundlesupport.JsonSupport.JSON_MIME_TYPE;
 
-import org.apache.commons.httpclient.HttpClient;
+import java.io.File;
+
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
@@ -32,9 +31,16 @@ import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.sling.maven.bundlesupport.fsresource.SlingInitialContentMounter;
 
 /**
  * Uninstall an OSGi bundle from a running Sling instance.
+ * 
+ * The plugin places by default an HTTP POST request to <a href="http://felix.apache.org/documentation/subprojects/apache-felix-web-console/web-console-restful-api.html#post-requests">
+ * Felix Web Console</a> to uninstall the bundle.
+ * It's also possible to use HTTP DELETE leveraging the <a href="http://sling.apache.org/documentation/development/repository-based-development.html">WebDAV bundle from Sling</a>.
+ * or the <a href="http://sling.apache.org/documentation/bundles/manipulating-content-the-slingpostservlet-servlets-post.html">Sling POST servlet</a> to uninstall the bundle. 
+ * The chosen method depends on the parameter {@link #deploymentMethod}.
  */
 @Mojo(name = "uninstall")
 public class BundleUninstallMojo extends AbstractBundleInstallMojo {
@@ -165,30 +171,9 @@ public class BundleUninstallMojo extends AbstractBundleInstallMojo {
         }
     }
 
-    /**
-     * Add configurations to a running OSGi instance for initial content.
-     * @param targetURL The web console base url
-     * @param file The artifact (bundle)
-     * @throws MojoExecutionException
-     */
     @Override
-    protected void configure(String targetURL, File file)
-    throws MojoExecutionException {
-        getLog().info("Removing file system provider configurations...");
-
-        // now get current configurations
-        final HttpClient client = this.getHttpClient();
-        final Map oldConfigs = this.getCurrentFileProviderConfigs(targetURL, client);
-
-
-        final Iterator entryIterator = oldConfigs.entrySet().iterator();
-        while ( entryIterator.hasNext() ) {
-            final Map.Entry current = (Map.Entry) entryIterator.next();
-            final String[] value = (String[])current.getValue();
-            getLog().debug("Removing old configuration for " + value[0] + " and " + value[1]);
-            // remove old config
-            removeConfiguration(client, targetURL, current.getKey().toString());
-        }
+    protected void configure(final String targetURL, final File file) throws MojoExecutionException {
+        new SlingInitialContentMounter(getLog(), getHttpClient(), project).unmount(targetURL, file);
     }
-
+    
 }

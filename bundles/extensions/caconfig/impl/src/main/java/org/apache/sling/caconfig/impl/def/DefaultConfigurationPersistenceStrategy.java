@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.resource.ModifiableValueMap;
 import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
@@ -31,8 +32,9 @@ import org.apache.sling.caconfig.resource.impl.util.MapUtil;
 import org.apache.sling.caconfig.resource.impl.util.PropertiesFilterUtil;
 import org.apache.sling.caconfig.spi.ConfigurationCollectionPersistData;
 import org.apache.sling.caconfig.spi.ConfigurationPersistData;
+import org.apache.sling.caconfig.spi.ConfigurationPersistenceAccessDeniedException;
 import org.apache.sling.caconfig.spi.ConfigurationPersistenceException;
-import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy;
+import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy2;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -47,9 +49,9 @@ import org.slf4j.LoggerFactory;
  * All existing properties are removed when new properties are stored in a singleton config resource.
  * All existing child resources are removed when a new configs are stored for collection config resources. 
  */
-@Component(service = ConfigurationPersistenceStrategy.class)
+@Component(service = ConfigurationPersistenceStrategy2.class)
 @Designate(ocd=DefaultConfigurationPersistenceStrategy.Config.class)
-public class DefaultConfigurationPersistenceStrategy implements ConfigurationPersistenceStrategy {
+public class DefaultConfigurationPersistenceStrategy implements ConfigurationPersistenceStrategy2 {
 
     @ObjectClassDefinition(name="Apache Sling Context-Aware Configuration Default Resource Persistence Strategy",
             description="Directly uses configuration resources for storing configuration data.")
@@ -77,6 +79,22 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
         }
         return resource;
     }
+    
+    @Override
+    public Resource getCollectionParentResource(Resource resource) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return resource;
+    }
+
+    @Override
+    public Resource getCollectionItemResource(Resource resource) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return resource;
+    }
 
     @Override
     public String getResourcePath(String resourcePath) {
@@ -87,13 +105,53 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
     }
 
     @Override
+    public String getCollectionParentResourcePath(String resourcePath) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return resourcePath;
+    }
+
+    @Override
+    public String getCollectionItemResourcePath(String resourcePath) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return resourcePath;
+    }
+
+    @Override
+    public String getConfigName(String configName, String relatedConfigPath) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return configName;
+    }
+
+    @Override
+    public String getCollectionParentConfigName(String configName, String relatedConfigPath) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return configName;
+    }
+
+    @Override
+    public String getCollectionItemConfigName(String configName, String relatedConfigPath) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return configName;
+    }
+    
+    @Override
     public boolean persistConfiguration(ResourceResolver resourceResolver, String configResourcePath,
             ConfigurationPersistData data) {
         if (!config.enabled()) {
             return false;
         }
         getOrCreateResource(resourceResolver, configResourcePath, data.getProperties());
-        commit(resourceResolver);
+        commit(resourceResolver, configResourcePath);
         return true;
     }
 
@@ -112,7 +170,7 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
             getOrCreateResource(resourceResolver, path, item.getProperties());
         }
         
-        commit(resourceResolver);
+        commit(resourceResolver, configResourceCollectionParentPath);
         return true;
     }
 
@@ -128,10 +186,10 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
                 resourceResolver.delete(resource);
             }
             catch (PersistenceException ex) {
-                throw new ConfigurationPersistenceException("Unable to delete configuration at " + configResourcePath, ex);
+                throw convertPersistenceException("Unable to delete configuration at " + configResourcePath, ex);
             }
         }
-        commit(resourceResolver);
+        commit(resourceResolver, configResourcePath);
         return true;
     }
     
@@ -144,7 +202,7 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
             return resource;
         }
         catch (PersistenceException ex) {
-            throw new ConfigurationPersistenceException("Unable to persist configuration to " + path, ex);
+            throw convertPersistenceException("Unable to persist configuration to " + path, ex);
         }
     }
 
@@ -157,7 +215,7 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
             }
         }
         catch (PersistenceException ex) {
-            throw new ConfigurationPersistenceException("Unable to remove children from " + resource.getPath(), ex);
+            throw convertPersistenceException("Unable to remove children from " + resource.getPath(), ex);
         }
     }
     
@@ -166,6 +224,9 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
             log.trace("! Store properties for resource {}: {}", resource.getPath(), MapUtil.traceOutput(properties));
         }
         ModifiableValueMap modValueMap = resource.adaptTo(ModifiableValueMap.class);
+        if (modValueMap == null) {
+            throw new ConfigurationPersistenceAccessDeniedException("No write access: Unable to store configuration data to " + resource.getPath() + ".");
+        }
         // remove all existing properties that are not filterd
         Set<String> propertyNamesToRemove = new HashSet<>(modValueMap.keySet());
         PropertiesFilterUtil.removeIgnoredProperties(propertyNamesToRemove);
@@ -175,13 +236,21 @@ public class DefaultConfigurationPersistenceStrategy implements ConfigurationPer
         modValueMap.putAll(properties);
     }
     
-    private void commit(ResourceResolver resourceResolver) {
+    private void commit(ResourceResolver resourceResolver, String relatedResourcePath) {
         try {
             resourceResolver.commit();
         }
         catch (PersistenceException ex) {
-            throw new ConfigurationPersistenceException("Unable to save configuration: " + ex.getMessage(), ex);
+            throw convertPersistenceException("Unable to persist configuration changes to " + relatedResourcePath, ex);
         }
+    }
+    
+    private ConfigurationPersistenceException convertPersistenceException(String message, PersistenceException ex) {
+        if (StringUtils.equals(ex.getCause().getClass().getName(), "javax.jcr.AccessDeniedException")) {
+            // detect if commit failed due to read-only access to repository 
+            return new ConfigurationPersistenceAccessDeniedException("No write access: " + message, ex);
+        }
+        return new ConfigurationPersistenceException(message, ex);
     }
 
 }

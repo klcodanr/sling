@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>29</version>
+        <version>30</version>
         <relativePath />
     </parent>
 
@@ -98,19 +98,6 @@
                 <extensions>true</extensions>
             </plugin>
       
-            <plugin>
-                <groupId>org.apache.felix</groupId>
-                <artifactId>maven-scr-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>generate-scr-scrdescriptor</id>
-                        <goals>
-                            <goal>scr</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-    
         </plugins>
     </build>
   

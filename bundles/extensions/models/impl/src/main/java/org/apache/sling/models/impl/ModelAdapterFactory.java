@@ -73,7 +73,6 @@ import org.apache.sling.models.factory.ModelClassException;
 import org.apache.sling.models.factory.ModelFactory;
 import org.apache.sling.models.factory.PostConstructException;
 import org.apache.sling.models.factory.ValidationException;
-import org.apache.sling.models.impl.injectors.ValuePreparer;
 import org.apache.sling.models.impl.model.ConstructorParameter;
 import org.apache.sling.models.impl.model.InjectableElement;
 import org.apache.sling.models.impl.model.InjectableField;
@@ -86,6 +85,7 @@ import org.apache.sling.models.spi.DisposalCallbackRegistry;
 import org.apache.sling.models.spi.ImplementationPicker;
 import org.apache.sling.models.spi.Injector;
 import org.apache.sling.models.spi.ModelValidation;
+import org.apache.sling.models.spi.ValuePreparer;
 import org.apache.sling.models.spi.injectorspecific.InjectAnnotationProcessor;
 import org.apache.sling.models.spi.injectorspecific.InjectAnnotationProcessorFactory;
 import org.apache.sling.models.spi.injectorspecific.InjectAnnotationProcessorFactory2;
@@ -799,23 +799,9 @@ public class ModelAdapterFactory implements AdapterFactory, Runnable, ModelFacto
     }
 
     private RuntimeException setField(InjectableField injectableField, Object createdObject, Object value) {
-        Field field = injectableField.getField();
-        Result<Object> result = adaptIfNecessary(value, field.getType(), field.getGenericType());
+        Result<Object> result = adaptIfNecessary(value, injectableField.getFieldType(), injectableField.getFieldGenericType());
         if (result.wasSuccessful()) {
-            boolean accessible = field.isAccessible();
-            try {
-                if (!accessible) {
-                    field.setAccessible(true);
-                }
-                field.set(createdObject, result.getValue());
-            } catch (Exception e) {
-                return new ModelClassException("Could not inject field due to reflection issues", e);
-            } finally {
-                if (!accessible) {
-                    field.setAccessible(false);
-                }
-            }
-            return null;
+            return injectableField.set(createdObject, result);
         } else {
             return result.getThrowable();
         }

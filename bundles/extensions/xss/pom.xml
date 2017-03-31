@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>28</version>
+        <version>30</version>
         <relativePath />
     </parent>
 
@@ -32,7 +32,7 @@
     <!-- ======================================================================= -->
     <artifactId>org.apache.sling.xss</artifactId>
     <packaging>bundle</packaging>
-    <version>1.0.17-SNAPSHOT</version>
+    <version>1.0.19-SNAPSHOT</version>
 
     <name>Apache Sling XSS Protection Bundle</name>
     <description>
@@ -67,10 +67,6 @@
         </pluginManagement>
 
         <plugins>
-            <plugin>
-                <groupId>org.apache.felix</groupId>
-                <artifactId>maven-scr-plugin</artifactId>
-            </plugin>
             <plugin>
                 <groupId>org.apache.sling</groupId>
                 <artifactId>maven-sling-plugin</artifactId>
@@ -255,12 +251,6 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.sling</groupId>
-            <artifactId>org.apache.sling.commons.json</artifactId>
-            <version>2.0.6</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
           <groupId>org.apache.sling</groupId>
           <artifactId>org.apache.sling.serviceusermapper</artifactId>
           <version>1.2.0</version>
@@ -270,6 +260,12 @@
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <version>2.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.geronimo.specs</groupId>
+            <artifactId>geronimo-json_1.0_spec</artifactId>
+            <version>1.0-alpha-1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -286,6 +282,12 @@
             <groupId>org.powermock</groupId>
             <artifactId>powermock-api-mockito</artifactId>
             <version>1.6.5</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sling</groupId>
+            <artifactId>org.apache.sling.commons.johnzon</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
         <dependency>

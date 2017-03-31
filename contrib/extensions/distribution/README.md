@@ -19,7 +19,8 @@ The Sling Content Distribution module consists of the following bundles:
 
  - org.apache.sling.distribution.api: this is where the APIs are defined
  - org.apache.sling.distribution.core: this is where the basic infrastructure for distributing content is implemented
- - org.apache.sling.distribution.extensions: this is where some additional (optional) extensions for distributing content are implemented
+ - org.apache.sling.distribution.kryo-serializer: Kryo based distribution package serializer
+ - org.apache.sling.distribution.avro-serializer: Apache Avro based distribution package serializer
  - org.apache.sling.distribution.sample: this is a set of sample configurations and implementations for demo purpose 
  - org.apache.sling.distribution.it: this is the integration testing suite
  
@@ -239,13 +240,13 @@ There is a single entry point in triggering a distribution workflow, via [Distri
 
 ## Extensions
 
-The _org.apache.sling.distribution.extensions_ bundle contains the following extensions:
+The following extensions for Apache Sling Content Distribution exist.
 
-### Apache Avro distribution serialization
-A _DistributionContentSerializer_ based on [Apache Avro](http://avro.apache.org).
+### Apache Avro serializer
+The _org.apache.sling.distribution.avro-serializer_ contains a _DistributionContentSerializer_ based on [Apache Avro](http://avro.apache.org).
 
-### Kryo distribution serialization
-A _DistributionContentSerializer_ based on [Kryo](http://github.com/EsotericSoftware/kryo).
+### Kryo serializer
+The _org.apache.sling.distribution.kryo-serializer_ contains a _DistributionContentSerializer_ based on [Kryo](http://github.com/EsotericSoftware/kryo).
 
 ## Ideas for future developments
 

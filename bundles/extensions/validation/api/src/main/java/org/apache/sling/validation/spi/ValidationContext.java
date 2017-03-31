@@ -18,14 +18,16 @@
  */
 package org.apache.sling.validation.spi;
 
+import java.util.ResourceBundle;
+
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.validation.ValidationService;
+import org.osgi.annotation.versioning.ProviderType;
 
-import aQute.bnd.annotation.ProviderType;
 
 /**
  * Used as parameter for each call of {@link Validator#validate(Object, ValidationContext, ValueMap)}
@@ -51,7 +53,12 @@ public interface ValidationContext {
 
     /**
      * Returns the severity to be issued for validation failures in this context.
-     * @return the severity of the validation failure. May be {@code null} when no explicit severity has been set in the model.
+     * @return the severity of the validation failure.
      */
-    @CheckForNull Integer getSeverity();
+    int getSeverity();
+    
+    /**
+     * @return resource bundle which should be able to give out the error message of the {@link Validator} in English.
+     */
+    @Nonnull ResourceBundle getDefaultResourceBundle();
 }

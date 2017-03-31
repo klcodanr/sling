@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>28</version>
+        <version>30</version>
         <relativePath />
     </parent>
 
@@ -87,6 +87,11 @@
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.service.http.whiteboard</artifactId>
             <version>1.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.scr.annotations</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>

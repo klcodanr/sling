@@ -28,6 +28,9 @@ def modules = [
         location: 'bundles/commons/json'
     ],
     [
+        location: 'bundles/commons/johnzon',
+    ],
+    [
         location: 'bundles/commons/log'
     ],
     [
@@ -179,6 +182,10 @@ def modules = [
         jdks: ["1.8"]
     ],
     [
+        location: 'bundles/extensions/org.apache.sling.resource.presence',
+        jdks: ["1.8"]
+    ],
+    [
         location: 'bundles/extensions/serviceusermapper'
     ],
     [
@@ -194,10 +201,6 @@ def modules = [
     ],
     [
         location: 'bundles/extensions/validation/examples',
-        jdks: ["1.8"]
-    ],
-    [
-        location: 'bundles/extensions/validation/it-http',
         jdks: ["1.8"]
     ],
     [
@@ -241,6 +244,9 @@ def modules = [
         location: 'bundles/jcr/contentloader'
     ],
     [
+        location: 'bundles/jcr/contentparser'
+    ],
+    [
         location: 'bundles/jcr/davex'
     ],
     [
@@ -251,9 +257,6 @@ def modules = [
     ],
     [
         location: 'bundles/jcr/jackrabbit-base'
-    ],
-    [
-        location: 'bundles/jcr/jackrabbit-server'
     ],
     [
         location: 'bundles/jcr/jackrabbit-usermanager'
@@ -296,7 +299,13 @@ def modules = [
         location: 'bundles/scripting/core'
     ],
     [
+        location: 'bundles/scripting/el-api'
+    ],
+    [
         location: 'bundles/scripting/javascript'
+    ],
+    [
+        location: 'bundles/scripting/jsp-api'
     ],
     [
         location: 'bundles/scripting/jsp-jstl'
@@ -336,9 +345,6 @@ def modules = [
     [
         location: 'bundles/scripting/sightly/testing',
         jdks: ['1.8']
-    ],
-    [
-        location: 'bundles/servlets/compat'
     ],
     [
         location: 'bundles/servlets/get'
@@ -587,24 +593,30 @@ def modules = [
     [
         location: "installer/providers/file"
     ],
-//    [
-//        location: 'karaf/org.apache.sling.karaf-distribution'
-//    ],
-//    [
-//        location: 'karaf/org.apache.sling.karaf-features'
-//    ],
-//    [
-//        location: 'karaf/org.apache.sling.karaf-integration-tests'
-//    ],
-//    [
-//        location: 'karaf/org.apache.sling.karaf-launchpad-oak-tar-integration-tests'
-//    ],
-//    [
-//        location: 'karaf/org.apache.sling.karaf-repoinit'
-//    ],
-//    [
-//        location: 'karaf/org.apache.sling.karaf-configs'
-//    ],
+    [
+        location: 'karaf/org.apache.sling.karaf-distribution',
+        jdks: ["1.8"]
+    ],
+    [
+        location: 'karaf/org.apache.sling.karaf-features',
+        jdks: ["1.8"]
+    ],
+    [
+        location: 'karaf/org.apache.sling.karaf-integration-tests',
+        jdks: ["1.8"]
+    ],
+    [
+        location: 'karaf/org.apache.sling.karaf-launchpad-oak-tar-integration-tests',
+        jdks: ["1.8"]
+    ],
+    [
+        location: 'karaf/org.apache.sling.karaf-repoinit',
+        jdks: ["1.8"]
+    ],
+    [
+        location: 'karaf/org.apache.sling.karaf-configs',
+        jdks: ["1.8"]
+    ],
     [
         location: 'launchpad/api',
         jdks: ["1.8"]
@@ -882,6 +894,8 @@ for more details</p>''')
                         url << 'http://svn.apache.org/viewcvs.cgi/?root=Apache-SVN'
                 }
             }
+
+            blockOnUpstreamProjects()
 
             triggers {
                 snapshotDependencies(true)

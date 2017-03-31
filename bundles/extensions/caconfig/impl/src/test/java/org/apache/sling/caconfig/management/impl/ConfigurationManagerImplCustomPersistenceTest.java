@@ -19,7 +19,7 @@
 package org.apache.sling.caconfig.management.impl;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy;
+import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy2;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -34,18 +34,42 @@ public class ConfigurationManagerImplCustomPersistenceTest extends Configuration
     @Before
     public void setUpCustomPersistence() {
         // custom strategy which redirects all config resources to a jcr:content subnode
-        context.registerService(ConfigurationPersistenceStrategy.class,
+        context.registerService(ConfigurationPersistenceStrategy2.class,
                 new CustomConfigurationPersistenceStrategy(), Constants.SERVICE_RANKING, 2000);
     }
 
     @Override
-    protected String getConfigPropsPath(String path) {
-        return StringUtils.replace(path + "/jcr:content", "/sling:configs/", "/settings/");
+    protected String getConfigResolvePath(String path) {
+        return replaceBucketName(path) + "/jcr:content";
+    }
+    
+    @Override
+    protected String getConfigPersistPath(String path) {
+        return path + "/jcr:content";
+    }
+    
+    @Override
+    protected String getConfigCollectionParentResolvePath(String path) {
+        return replaceBucketName(path);
+    }
+    
+    @Override
+    protected String getConfigCollectionParentPersistPath(String path) {
+        return path;
+    }
+    
+    @Override
+    protected String getConfigCollectionItemResolvePath(String path) {
+        return replaceBucketName(path) + "/jcr:content";
+    }
+    
+    @Override
+    protected String getConfigCollectionItemPersistPath(String path) {
+        return path + "/jcr:content";
     }
 
-    @Override
-    protected String getConfigPropsPersistPath(String path) {
-        return path + "/jcr:content";
+    private String replaceBucketName(String path) {
+        return StringUtils.replace(path, "/sling:configs/", "/settings/");
     }
 
     @Override
@@ -53,9 +77,4 @@ public class ConfigurationManagerImplCustomPersistenceTest extends Configuration
         return new String[] { "settings" };
     }
 
-    @Override
-    protected String getConfigCollectionParentPath(String path) {
-        return StringUtils.replace(path, "/sling:configs/", "/settings/");
-    }
-    
 }

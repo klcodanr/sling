@@ -24,8 +24,8 @@ import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.validation.SlingValidationException;
 import org.apache.sling.validation.ValidationFailure;
 import org.apache.sling.validation.ValidationResult;
-import org.apache.sling.validation.spi.DefaultValidationFailure;
-import org.apache.sling.validation.spi.DefaultValidationResult;
+import org.apache.sling.validation.spi.support.DefaultValidationFailure;
+import org.apache.sling.validation.spi.support.DefaultValidationResult;
 import org.apache.sling.validation.spi.ValidationContext;
 import org.apache.sling.validation.spi.Validator;
 import org.osgi.framework.Constants;
@@ -35,7 +35,8 @@ import org.osgi.service.component.annotations.Component;
     service = Validator.class,
     property = {
         Constants.SERVICE_DESCRIPTION + "=Apache Sling Fling Sample “Comment Validator”",
-        Constants.SERVICE_VENDOR + "=The Apache Software Foundation"
+        Constants.SERVICE_VENDOR + "=The Apache Software Foundation",
+        "validator.id=org.apache.sling.samples.fling.validation.CommentValidator"
     },
     immediate = true
 )
@@ -56,7 +57,7 @@ public class CommentValidator implements Validator<String> {
             return DefaultValidationResult.VALID;
 
         } else {
-            final ValidationFailure failure = new DefaultValidationFailure(validationContext.getLocation(), 0, I18N_MESSAGE_KEY, comment);
+            final ValidationFailure failure = new DefaultValidationFailure(validationContext.getLocation(), 0, validationContext.getDefaultResourceBundle(), I18N_MESSAGE_KEY, comment);
             return new DefaultValidationResult(failure);
         }
     }

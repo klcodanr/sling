@@ -18,12 +18,13 @@
  */
 package org.apache.sling.fsprovider.internal;
 
-import static org.apache.sling.fsprovider.internal.TestUtils.REGISTER_FSRESOURCE_PLUGIN;
 import static org.apache.sling.fsprovider.internal.TestUtils.assertFile;
 import static org.apache.sling.fsprovider.internal.TestUtils.assertFolder;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.fsprovider.internal.TestUtils.RegisterFsResourcePlugin;
 import org.apache.sling.hamcrest.ResourceMatchers;
 import org.apache.sling.testing.mock.sling.ResourceResolverType;
 import org.apache.sling.testing.mock.sling.junit.SlingContext;
@@ -33,7 +34,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 /**
- * Test access to files and folders from filesystem.
+ * Test access to files and folders from file system.
  */
 public class FilesFolderTest {
 
@@ -42,7 +43,7 @@ public class FilesFolderTest {
 
     @Rule
     public SlingContext context = new SlingContextBuilder(ResourceResolverType.JCR_MOCK)
-        .plugin(REGISTER_FSRESOURCE_PLUGIN)
+        .plugin(new RegisterFsResourcePlugin())
         .build();
 
     @Before
@@ -56,6 +57,7 @@ public class FilesFolderTest {
         assertFolder(fsroot, "folder1");
         assertFolder(fsroot, "folder1/folder11");
         assertFolder(fsroot, "folder2");
+        assertFolder(fsroot, "folder3");
     }
 
     @Test
@@ -63,14 +65,18 @@ public class FilesFolderTest {
         assertFile(fsroot, "folder1/file1a.txt", "file1a");
         assertFile(fsroot, "folder1/file1b.txt", "file1b");
         assertFile(fsroot, "folder1/folder11/file11a.txt", "file11a");
-        assertFile(fsroot, "folder2/file2a.txt", "file2a");
+        assertFile(fsroot, "folder2/content.json", null);
+        assertFile(fsroot, "folder2/content/file2content.txt", "file2content");
+        assertFile(fsroot, "folder3/content.jcr.xml", null);
     }
 
     @Test
     public void testListChildren() {
         assertThat(root, ResourceMatchers.containsChildren("fs-test"));
-        assertThat(fsroot, ResourceMatchers.hasChildren("folder1", "folder2"));
-        assertThat(fsroot.getChild("folder1"), ResourceMatchers.hasChildren("file1a.txt", "file1b.txt"));
+        assertThat(fsroot, ResourceMatchers.hasChildren("folder1", "folder2", "folder3"));
+        assertThat(fsroot.getChild("folder1"), ResourceMatchers.hasChildren("folder11", "file1a.txt", "file1b.txt"));
+        assertThat(fsroot.getChild("folder2"), ResourceMatchers.hasChildren("folder21", "content.json"));
+        assertFalse(fsroot.getChild("folder1/file1a.txt").listChildren().hasNext());
     }
 
 }

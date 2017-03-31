@@ -18,18 +18,19 @@
  */
 package org.apache.sling.fsprovider.internal;
 
+import static org.apache.sling.fsprovider.internal.TestUtils.assertChange;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.sling.api.resource.observation.ResourceChange;
 import org.apache.sling.api.resource.observation.ResourceChange.ChangeType;
 import org.apache.sling.api.resource.observation.ResourceChangeListener;
+import org.apache.sling.fsprovider.internal.TestUtils.ResourceListener;
 import org.apache.sling.testing.mock.sling.ResourceResolverType;
 import org.apache.sling.testing.mock.sling.junit.SlingContext;
 import org.apache.sling.testing.mock.sling.junit.SlingContextBuilder;
@@ -38,10 +39,13 @@ import org.junit.Rule;
 import org.junit.Test;
 
 /**
- * Test events when changing filesystem content.
+ * Test events when changing file system content (Sling-Initial-Content).
  */
 public class FileMonitorTest {
 
+    private static final int CHECK_INTERVAL = 120;
+    private static final int WAIT_INTERVAL = 250;
+    
     private final File tempDir;
     private final ResourceListener resourceListener = new ResourceListener();
     
@@ -63,7 +67,9 @@ public class FileMonitorTest {
                 context.registerInjectActivateService(new FsResourceProvider(),
                         "provider.file", tempDir.getPath(),
                         "provider.root", "/fs-test",
-                        "provider.checkinterval", 120);
+                        "provider.checkinterval", CHECK_INTERVAL,
+                        "provider.fs.mode", FsMode.INITIAL_CONTENT.name(),
+                        "provider.initial.content.import.options", "overwrite:=true;ignoreImportProviders:=jcr.xml");
                 
                 // register resource change listener
                 context.registerService(ResourceChangeListener.class, resourceListener,
@@ -85,12 +91,12 @@ public class FileMonitorTest {
         assertTrue(changes.isEmpty());
         
         File file1a = new File(tempDir, "folder1/file1a.txt");
-        FileUtils.write(file1a, "newcontent");
+        FileUtils.touch(file1a);
         
-        Thread.sleep(250);
+        Thread.sleep(WAIT_INTERVAL);
 
         assertEquals(1, changes.size());
-        assertChange(changes, 0, "/fs-test/folder1/file1a.txt", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder1/file1a.txt", ChangeType.CHANGED);
     }
     
     @Test
@@ -101,11 +107,11 @@ public class FileMonitorTest {
         File file1c = new File(tempDir, "folder1/file1c.txt");
         FileUtils.write(file1c, "newcontent");
         
-        Thread.sleep(250);
+        Thread.sleep(WAIT_INTERVAL);
 
         assertEquals(2, changes.size());
-        assertChange(changes, 0, "/fs-test/folder1", ChangeType.CHANGED);
-        assertChange(changes, 1, "/fs-test/folder1/file1c.txt", ChangeType.ADDED);
+        assertChange(changes, "/fs-test/folder1", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder1/file1c.txt", ChangeType.ADDED);
     }
     
     @Test
@@ -116,11 +122,11 @@ public class FileMonitorTest {
         File file1a = new File(tempDir, "folder1/file1a.txt");
         file1a.delete();
         
-        Thread.sleep(250);
+        Thread.sleep(WAIT_INTERVAL);
 
         assertEquals(2, changes.size());
-        assertChange(changes, 0, "/fs-test/folder1", ChangeType.CHANGED);
-        assertChange(changes, 1, "/fs-test/folder1/file1a.txt", ChangeType.REMOVED);
+        assertChange(changes, "/fs-test/folder1", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder1/file1a.txt", ChangeType.REMOVED);
     }
     
     @Test
@@ -128,14 +134,14 @@ public class FileMonitorTest {
         List<ResourceChange> changes = resourceListener.getChanges();
         assertTrue(changes.isEmpty());
         
-        File folder3 = new File(tempDir, "folder3");
-        folder3.mkdir();
+        File folder99 = new File(tempDir, "folder99");
+        folder99.mkdir();
         
-        Thread.sleep(250);
+        Thread.sleep(WAIT_INTERVAL);
 
         assertEquals(2, changes.size());
-        assertChange(changes, 0, "/fs-test", ChangeType.CHANGED);
-        assertChange(changes, 1, "/fs-test/folder3", ChangeType.ADDED);
+        assertChange(changes, "/fs-test", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder99", ChangeType.ADDED);
     }
     
     @Test
@@ -146,29 +152,57 @@ public class FileMonitorTest {
         File folder1 = new File(tempDir, "folder1");
         FileUtils.deleteDirectory(folder1);
         
-        Thread.sleep(250);
+        Thread.sleep(WAIT_INTERVAL);
 
         assertEquals(2, changes.size());
-        assertChange(changes, 0, "/fs-test", ChangeType.CHANGED);
-        assertChange(changes, 1, "/fs-test/folder1", ChangeType.REMOVED);
+        assertChange(changes, "/fs-test", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder1", ChangeType.REMOVED);
     }
 
-    
-    private void assertChange(List<ResourceChange> changes, int index, String path, ChangeType changeType) {
-        ResourceChange change = changes.get(index);
-        assertEquals(path, change.getPath());
-        assertEquals(changeType, change.getType());
-    }
-    
-    static class ResourceListener implements ResourceChangeListener {
-        private final List<ResourceChange> allChanges = new ArrayList<>();
-        @Override
-        public void onChange(List<ResourceChange> changes) {
-            allChanges.addAll(changes);
-        }
-        public List<ResourceChange> getChanges() {
-            return allChanges;
-        }
-    }
+    @Test
+    public void testUpdateContent() throws Exception {
+        List<ResourceChange> changes = resourceListener.getChanges();
+        assertTrue(changes.isEmpty());
+        
+        File file1a = new File(tempDir, "folder2/content.json");
+        FileUtils.touch(file1a);
+        
+        Thread.sleep(WAIT_INTERVAL);
 
+        assertChange(changes, "/fs-test/folder2/content", ChangeType.REMOVED);
+        assertChange(changes, "/fs-test/folder2/content", ChangeType.ADDED);
+        assertChange(changes, "/fs-test/folder2/content/jcr:content", ChangeType.ADDED);
+    }
+    
+    @Test
+    public void testAddContent() throws Exception {
+        List<ResourceChange> changes = resourceListener.getChanges();
+        assertTrue(changes.isEmpty());
+        
+        File file1c = new File(tempDir, "folder1/file1c.json");
+        FileUtils.write(file1c, "{\"prop1\":\"value1\",\"child1\":{\"prop2\":\"value1\"}}");
+        
+        Thread.sleep(WAIT_INTERVAL);
+
+        assertEquals(3, changes.size());
+        assertChange(changes, "/fs-test/folder1", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder1/file1c", ChangeType.ADDED);
+        assertChange(changes, "/fs-test/folder1/file1c/child1", ChangeType.ADDED);
+    }
+    
+    @Test
+    public void testRemoveContent() throws Exception {
+        List<ResourceChange> changes = resourceListener.getChanges();
+        assertTrue(changes.isEmpty());
+        
+        File file1a = new File(tempDir, "folder2/content.json");
+        file1a.delete();
+        
+        Thread.sleep(WAIT_INTERVAL);
+
+        assertEquals(2, changes.size());
+        assertChange(changes, "/fs-test/folder2", ChangeType.CHANGED);
+        assertChange(changes, "/fs-test/folder2/content", ChangeType.REMOVED);
+    }
+    
 }

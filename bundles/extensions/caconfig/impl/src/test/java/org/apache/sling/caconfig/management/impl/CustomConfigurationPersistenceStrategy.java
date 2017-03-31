@@ -18,6 +18,8 @@
  */
 package org.apache.sling.caconfig.management.impl;
 
+import static org.junit.Assert.assertNotNull;
+
 import java.util.HashSet;
 import java.util.Map;
 
@@ -32,28 +34,71 @@ import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.caconfig.spi.ConfigurationCollectionPersistData;
 import org.apache.sling.caconfig.spi.ConfigurationPersistData;
 import org.apache.sling.caconfig.spi.ConfigurationPersistenceException;
-import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy;
+import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy2;
 
 /**
  * This is a variant of {@link org.apache.sling.caconfig.impl.def.DefaultConfigurationPersistenceStrategy}
  * which reads and stores data from a sub-resources named "jcr:content".
  */
-public class CustomConfigurationPersistenceStrategy implements ConfigurationPersistenceStrategy {
+public class CustomConfigurationPersistenceStrategy implements ConfigurationPersistenceStrategy2 {
     
-    private static final String DEFAULT_RESOURCE_TYPE = JcrConstants.NT_UNSTRUCTURED;
-    
-    private static final String CHILD_NODE_NAME = "jcr:content";
+    private static final String DEFAULT_RESOURCE_TYPE = JcrConstants.NT_UNSTRUCTURED;    
+    private static final String CHILD_NODE_NAME = JcrConstants.JCR_CONTENT;
     
     @Override
     public Resource getResource(Resource resource) {
+        assertNotNull(resource);
+        return resource.getChild(CHILD_NODE_NAME);
+    }
+
+    @Override
+    public Resource getCollectionParentResource(Resource resource) {
+        assertNotNull(resource);
+        return resource;
+    }
+
+    @Override
+    public Resource getCollectionItemResource(Resource resource) {
+        assertNotNull(resource);
         return resource.getChild(CHILD_NODE_NAME);
     }
 
     @Override
     public String getResourcePath(String resourcePath) {
+        assertNotNull(resourcePath);
         return resourcePath + "/" + CHILD_NODE_NAME;
     }
 
+    @Override
+    public String getCollectionParentResourcePath(String resourcePath) {
+        assertNotNull(resourcePath);
+        return resourcePath;
+    }
+
+    @Override
+    public String getCollectionItemResourcePath(String resourcePath) {
+        assertNotNull(resourcePath);
+        return resourcePath + "/" + CHILD_NODE_NAME;
+    }
+
+    @Override
+    public String getConfigName(String configName, String relatedConfigPath) {
+        assertNotNull(configName);
+        return configName + "/" + CHILD_NODE_NAME;
+    }
+
+    @Override
+    public String getCollectionParentConfigName(String configName, String relatedConfigPath) {
+        assertNotNull(configName);
+        return configName;
+    }
+
+    @Override
+    public String getCollectionItemConfigName(String configName, String relatedConfigPath) {
+        assertNotNull(configName);
+        return configName + "/" + CHILD_NODE_NAME;
+    }
+    
     @Override
     public boolean persistConfiguration(ResourceResolver resourceResolver, String configResourcePath,
             ConfigurationPersistData data) {

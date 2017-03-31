@@ -35,7 +35,7 @@ import org.apache.sling.caconfig.example.ListConfig;
 import org.apache.sling.caconfig.example.NestedConfig;
 import org.apache.sling.caconfig.example.SimpleConfig;
 import org.apache.sling.caconfig.management.impl.CustomConfigurationPersistenceStrategy;
-import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy;
+import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy2;
 import org.apache.sling.testing.mock.sling.junit.SlingContext;
 import org.junit.Before;
 import org.junit.Rule;
@@ -61,7 +61,7 @@ public class ConfigurationResolverCustomPersistenceTest {
                 "configBucketNames", "settings");
 
         // custom strategy which redirects all config resources to a jcr:content subnode
-        context.registerService(ConfigurationPersistenceStrategy.class,
+        context.registerService(ConfigurationPersistenceStrategy2.class,
                 new CustomConfigurationPersistenceStrategy(), Constants.SERVICE_RANKING, 2000);
         
         // content resources

@@ -28,25 +28,39 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.CharEncoding;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.resource.Resource;
+import org.apache.sling.api.resource.observation.ResourceChange;
+import org.apache.sling.api.resource.observation.ResourceChange.ChangeType;
+import org.apache.sling.api.resource.observation.ResourceChangeListener;
 import org.apache.sling.hamcrest.ResourceMatchers;
+import org.apache.sling.testing.mock.osgi.MapUtil;
 import org.apache.sling.testing.mock.osgi.context.AbstractContextPlugin;
-import org.apache.sling.testing.mock.osgi.context.ContextPlugin;
 import org.apache.sling.testing.mock.sling.context.SlingContextImpl;
 
 class TestUtils {
 
-    public static ContextPlugin<SlingContextImpl> REGISTER_FSRESOURCE_PLUGIN = new AbstractContextPlugin<SlingContextImpl>() {
+    public static class RegisterFsResourcePlugin extends AbstractContextPlugin<SlingContextImpl> {
+        private final Map<String,Object> props;
+        public RegisterFsResourcePlugin(Object... props) {
+            this.props = MapUtil.toMap(props); 
+        }
         @Override
         public void beforeSetUp(SlingContextImpl context) throws Exception {
-            context.registerInjectActivateService(new FsResourceProvider(),
-                    "provider.file", "src/test/resources/fs-test",
-                    "provider.root", "/fs-test",
-                    "provider.checkinterval", 0);
+            Map<String,Object> config = new HashMap<>();
+            config.put("provider.file", "src/test/resources/fs-test");
+            config.put("provider.root", "/fs-test");
+            config.put("provider.checkinterval", 0);
+            config.put("provider.fs.mode", FsMode.FILES_FOLDERS.name());
+            config.putAll(props);
+            context.registerInjectActivateService(new FsResourceProvider(), config);
         }
     };
 
@@ -69,19 +83,43 @@ class TestUtils {
         assertThat(file, ResourceMatchers.props("jcr:primaryType", "nt:file"));
         assertEquals("nt:file", file.getResourceType());
         
-        try {
-            try (InputStream is = file.adaptTo(InputStream.class)) {
-                String data = IOUtils.toString(is, CharEncoding.UTF_8);
-                assertEquals(content, data);
-            }
-        }
-        catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-
         assertNull(file.getResourceSuperType());
         assertEquals(file.getName(), file.adaptTo(File.class).getName());
         assertTrue(StringUtils.contains(file.adaptTo(URL.class).toString(), file.getName()));
+        
+        if (content != null) {
+            try {
+                try (InputStream is = file.adaptTo(InputStream.class)) {
+                    String data = IOUtils.toString(is, CharEncoding.UTF_8);
+                    assertEquals(content, data);
+                }
+            }
+            catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
     }    
+
+    public static void assertChange(List<ResourceChange> changes, String path, ChangeType changeType) {
+        boolean found = false;
+        for (ResourceChange change : changes) {
+            if (StringUtils.equals(change.getPath(), path) && change.getType() == changeType) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue("Change with path=" + path + ", changeType=" + changeType + " expected", found);
+    }
+    
+    public static class ResourceListener implements ResourceChangeListener {
+        private final List<ResourceChange> allChanges = new ArrayList<>();
+        @Override
+        public void onChange(List<ResourceChange> changes) {
+            allChanges.addAll(changes);
+        }
+        public List<ResourceChange> getChanges() {
+            return allChanges;
+        }
+    }
 
 }

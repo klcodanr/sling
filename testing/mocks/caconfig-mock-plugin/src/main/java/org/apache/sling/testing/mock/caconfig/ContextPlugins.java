@@ -22,11 +22,8 @@ import org.apache.sling.caconfig.impl.ConfigurationBuilderAdapterFactory;
 import org.apache.sling.caconfig.impl.ConfigurationResolverImpl;
 import org.apache.sling.caconfig.impl.def.DefaultConfigurationPersistenceStrategy;
 import org.apache.sling.caconfig.impl.metadata.AnnotationClassConfigurationMetadataProvider;
-import org.apache.sling.caconfig.impl.metadata.ConfigurationMetadataProviderMultiplexer;
 import org.apache.sling.caconfig.management.impl.ConfigurationManagerImpl;
-import org.apache.sling.caconfig.management.impl.ConfigurationPersistenceStrategyMultiplexer;
 import org.apache.sling.caconfig.resource.impl.ConfigurationResourceResolverImpl;
-import org.apache.sling.caconfig.resource.impl.ConfigurationResourceResolvingStrategyMultiplexer;
 import org.apache.sling.caconfig.resource.impl.def.DefaultConfigurationResourceResolvingStrategy;
 import org.apache.sling.caconfig.resource.impl.def.DefaultContextPathStrategy;
 import org.apache.sling.testing.mock.osgi.context.AbstractContextPlugin;
@@ -36,7 +33,7 @@ import org.osgi.annotation.versioning.ProviderType;
 
 /**
  * Mock context plugins.
- * The plugin supports both 1.0/1.1 and 1.2+ version of the Impl/SPI.
+ * The plugin supports all versions from 1.0 to the most recent versions of the Impl/SPI.
  */
 @ProviderType
 public final class ContextPlugins {
@@ -85,7 +82,11 @@ public final class ContextPlugins {
             registerByClassName(context, "org.apache.sling.caconfig.resource.impl.ContextPathStrategyMultiplexer");
         }
         
-        context.registerInjectActivateService(new ConfigurationResourceResolvingStrategyMultiplexer());
+        if (!registerByClassName(context, "org.apache.sling.caconfig.resource.impl.ConfigurationResourceResolvingStrategyMultiplexerImpl")) {
+            // fallback to impl 1.2
+            registerByClassName(context, "org.apache.sling.caconfig.resource.impl.ConfigurationResourceResolvingStrategyMultiplexer");
+        }
+        
         context.registerInjectActivateService(new ConfigurationResourceResolverImpl());
     }
 
@@ -103,14 +104,29 @@ public final class ContextPlugins {
      * @param context Sling context
      */
     private static void registerConfigurationResolver(SlingContextImpl context) {
-        context.registerInjectActivateService(new ConfigurationPersistenceStrategyMultiplexer());
-        context.registerInjectActivateService(new ConfigurationMetadataProviderMultiplexer());
         
-        // only required for impl 1.2+
-        registerByClassName(context, "org.apache.sling.caconfig.impl.ConfigurationInheritanceStrategyMultiplexer");
+        if (!registerByClassName(context, "org.apache.sling.caconfig.management.impl.ConfigurationPersistenceStrategyMultiplexerImpl")) {
+            // fallback to impl 1.2
+            registerByClassName(context, "org.apache.sling.caconfig.management.impl.ConfigurationPersistenceStrategyMultiplexer");
+        }
         
-        // only required for impl 1.2+
-        registerByClassName(context, "org.apache.sling.caconfig.impl.override.ConfigurationOverrideManager");
+        // only required for impl 1.3+
+        registerByClassName(context, "org.apache.sling.caconfig.impl.ConfigurationPersistenceStrategyBridge");
+
+        if (!registerByClassName(context, "org.apache.sling.caconfig.impl.metadata.ConfigurationMetadataProviderMultiplexerImpl")) {
+            // fallback to impl 1.2
+            registerByClassName(context, "org.apache.sling.caconfig.impl.metadata.ConfigurationMetadataProviderMultiplexer");
+        }
+        
+        if (!registerByClassName(context, "org.apache.sling.caconfig.impl.ConfigurationInheritanceStrategyMultiplexerImpl")) {
+            // fallback to impl 1.2 (not existing in 1.1 or below)
+            registerByClassName(context, "org.apache.sling.caconfig.impl.ConfigurationInheritanceStrategyMultiplexer");
+        }
+        
+        if (!registerByClassName(context, "org.apache.sling.caconfig.impl.override.ConfigurationOverrideMultiplexerImpl")) {
+            // fallback to impl 1.2 (not existing in 1.1 or below)
+            registerByClassName(context, "org.apache.sling.caconfig.impl.override.ConfigurationOverrideManager");
+        }
 
         context.registerInjectActivateService(new ConfigurationResolverImpl());
         context.registerInjectActivateService(new ConfigurationBuilderAdapterFactory());

@@ -47,8 +47,6 @@ public class SlingOptions {
         return composite(
             mavenBundle().groupId("org.apache.felix").artifactId("org.apache.felix.http.jetty").version(versionResolver),
             mavenBundle().groupId("org.apache.felix").artifactId("org.apache.felix.http.servlet-api").version(versionResolver),
-            mavenBundle().groupId("javax.servlet.jsp").artifactId("javax.servlet.jsp-api").version(versionResolver),
-            mavenBundle().groupId("javax.el").artifactId("javax.el-api").version(versionResolver),
             config()
         );
     }
@@ -182,6 +180,7 @@ public class SlingOptions {
             webconsole(),
             slingCommonsClassloader(),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.commons.fsclassloader").version(versionResolver),
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.commons.osgi").version(versionResolver),
             mavenBundle().groupId("commons-io").artifactId("commons-io").version(versionResolver),
             mavenBundle().groupId("org.apache.commons").artifactId("commons-lang3").version(versionResolver)
         );
@@ -381,6 +380,16 @@ public class SlingOptions {
         );
     }
 
+    public static Option slingExtensionResourcePresence() {
+        return composite(
+            sling(),
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.resource.presence").version(versionResolver),
+            factoryConfiguration("org.apache.sling.serviceusermapping.impl.ServiceUserMapperImpl.amended")
+                .put("user.mapping", new String[]{"org.apache.sling.resource.presence=sling-readall"})
+                .asOption()
+        );
+    }
+
     public static Option slingExtensionResourcemerger() {
         return composite(
             sling(),
@@ -437,6 +446,14 @@ public class SlingOptions {
         );
     }
 
+    public static Option slingInstallerHealthcheck() {
+        return composite(
+            slingInstaller(),
+            slingExtensionHealthcheck(),
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.installer.hc").version(versionResolver)
+        );
+    }
+
     public static Option slingInstallerProviderFile() {
         return composite(
             slingInstaller(),
@@ -472,7 +489,7 @@ public class SlingOptions {
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.webconsole").version(versionResolver),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.webdav").version(versionResolver),
             factoryConfiguration("org.apache.sling.jcr.base.internal.LoginAdminWhitelist.fragment")
-                .put("whitelist.bundles", new String[]{"org.apache.sling.discovery.commons", "org.apache.sling.discovery.base", "org.apache.sling.discovery.oak", "org.apache.sling.extensions.webconsolesecurityprovider", "org.apache.sling.i18n", "org.apache.sling.jcr.base", "org.apache.sling.jcr.classloader", "org.apache.sling.jcr.contentloader", "org.apache.sling.jcr.davex", "org.apache.sling.jcr.jackrabbit.usermanager", "org.apache.sling.jcr.oak.server", "org.apache.sling.jcr.repoinit", "org.apache.sling.jcr.resource", "org.apache.sling.jcr.webconsole", "org.apache.sling.servlets.post", "org.apache.sling.servlets.resolver"})
+                .put("whitelist.bundles", new String[]{"org.apache.sling.discovery.commons", "org.apache.sling.discovery.base", "org.apache.sling.discovery.oak", "org.apache.sling.extensions.webconsolesecurityprovider", "org.apache.sling.jcr.base", "org.apache.sling.jcr.classloader", "org.apache.sling.jcr.contentloader", "org.apache.sling.jcr.davex", "org.apache.sling.jcr.jackrabbit.usermanager", "org.apache.sling.jcr.oak.server", "org.apache.sling.jcr.repoinit", "org.apache.sling.jcr.resource", "org.apache.sling.jcr.webconsole"})
                 .put("whitelist.name", "sling")
                 .asOption(),
             factoryConfiguration("org.apache.sling.serviceusermapping.impl.ServiceUserMapperImpl.amended")
@@ -563,7 +580,7 @@ public class SlingOptions {
             mavenBundle().groupId("org.apache.felix").artifactId("org.apache.felix.webconsole.plugins.memoryusage").version(versionResolver),
             mavenBundle().groupId("org.apache.felix").artifactId("org.apache.felix.webconsole.plugins.packageadmin").version(versionResolver),
             newConfiguration("org.apache.sling.jcr.repoinit.impl.RepositoryInitializer")
-                .put("references", new String[]{"raw:classpath://org.apache.sling.karaf-repoinit/sling.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-discovery.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-event.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-i18n.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-installer-jcr.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-scripting.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-xss.txt"})
+                .put("references", new String[]{"raw:classpath://org.apache.sling.karaf-repoinit/sling.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-discovery.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-event.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-i18n.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-installer-jcr.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-scripting.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-validation.txt", "raw:classpath://org.apache.sling.karaf-repoinit/sling-xss.txt"})
                 .asOption(),
             factoryConfiguration("org.apache.felix.jaas.Configuration.factory")
                 .put("jaas.classname", "org.apache.jackrabbit.oak.spi.security.authentication.GuestLoginModule")
@@ -582,9 +599,6 @@ public class SlingOptions {
             newConfiguration("org.apache.felix.jaas.ConfigurationSpi")
                 .put("jaas.configProviderName", "FelixJaasProvider")
                 .put("jaas.defaultRealmName", "jackrabbit.oak")
-                .asOption(),
-            newConfiguration("org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProviderService")
-                .put("localIndexDir", "sling/repository/index")
                 .asOption(),
             newConfiguration("org.apache.jackrabbit.oak.security.authentication.AuthenticationConfigurationImpl")
                 .put("org.apache.jackrabbit.oak.authentication.configSpiName", "FelixJaasProvider")
@@ -609,9 +623,13 @@ public class SlingOptions {
     public static Option slingLaunchpadOakTar() {
         return composite(
             slingLaunchpadOak(),
-            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-segment").version(versionResolver),
+            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-lucene").version(versionResolver),
+            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-segment-tar").version(versionResolver),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.oak.server").version(versionResolver),
-            newConfiguration("org.apache.jackrabbit.oak.plugins.segment.SegmentNodeStoreService")
+            newConfiguration("org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProviderService")
+                .put("localIndexDir", "sling/repository/index")
+                .asOption(),
+            newConfiguration("org.apache.jackrabbit.oak.segment.SegmentNodeStoreService")
                 .put("name", "Default NodeStore")
                 .put("repository.home", "sling/repository")
                 .asOption()
@@ -621,9 +639,13 @@ public class SlingOptions {
     public static Option slingLaunchpadOakMongo() {
         return composite(
             slingLaunchpadOak(),
+            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-lucene").version(versionResolver),
             mavenBundle().groupId("org.mongodb").artifactId("mongo-java-driver").version(versionResolver),
             mavenBundle().groupId("com.h2database").artifactId("h2-mvstore").version(versionResolver),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.oak.server").version(versionResolver),
+            newConfiguration("org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProviderService")
+                .put("localIndexDir", "sling/repository/index")
+                .asOption(),
             newConfiguration("org.apache.jackrabbit.oak.plugins.document.DocumentNodeStoreService")
                 .put("db", "sling")
                 .put("mongouri", "mongodb://localhost:27017")
@@ -694,12 +716,15 @@ public class SlingOptions {
         );
     }
 
+    // DO NOT REMOVE org.apache.sling.scripting.jsp-api and org.apache.sling.scripting.el-api
     public static Option slingScriptingJsp() {
         return composite(
             slingScripting(),
             slingCommonsCompiler(),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.scripting.jsp").version(versionResolver),
-            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.scripting.jsp.taglib").version(versionResolver)
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.scripting.jsp.taglib").version(versionResolver),
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.scripting.jsp-api").version(versionResolver),
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.scripting.el-api").version(versionResolver)
         );
     }
 
@@ -731,6 +756,9 @@ public class SlingOptions {
             slingScripting(),
             slingExtensionI18n(),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.scripting.thymeleaf").version(versionResolver),
+            mavenBundle().groupId("org.attoparser").artifactId("attoparser").version(versionResolver),
+            mavenBundle().groupId("org.unbescape").artifactId("unbescape").version(versionResolver),
+            mavenBundle().groupId("org.apache.servicemix.bundles").artifactId("org.apache.servicemix.bundles.ognl").version(versionResolver),
             mavenBundle().groupId("org.javassist").artifactId("javassist").version(versionResolver),
             factoryConfiguration("org.apache.sling.serviceusermapping.impl.ServiceUserMapperImpl.amended")
                 .put("user.mapping", new String[]{"org.apache.sling.scripting.thymeleaf=sling-scripting"})
@@ -788,7 +816,6 @@ public class SlingOptions {
             mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-commons").version(versionResolver),
             mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-blob").version(versionResolver),
             mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-jcr").version(versionResolver),
-            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-lucene").version(versionResolver),
             mavenBundle().groupId("com.google.guava").artifactId("guava").version(versionResolver),
             mavenBundle().groupId("org.apache.felix").artifactId("org.apache.felix.jaas").version(versionResolver)
         );
@@ -814,7 +841,7 @@ public class SlingOptions {
             mavenBundle().groupId("com.composum.sling.core").artifactId("composum-sling-package-manager").version(versionResolver),
             mavenBundle().groupId("org.apache.jackrabbit.vault").artifactId("org.apache.jackrabbit.vault").version(versionResolver),
             factoryConfiguration("org.apache.sling.jcr.base.internal.LoginAdminWhitelist.fragment")
-                .put("whitelist.bundles", new String[]{"com.composum.core.commons"})
+                .put("whitelist.bundles", new String[]{"com.composum.core.commons", "com.composum.core.pckgmgr"})
                 .put("whitelist.name", "composum")
                 .asOption()
         );
@@ -826,17 +853,39 @@ public class SlingOptions {
         final String localIndexDir = String.format("%s/index", repositoryHome);
         return composite(
             slingLaunchpadOak(),
-            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-segment").version(versionResolver),
+            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-lucene").version(versionResolver),
+            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-segment-tar").version(versionResolver),
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.oak.server").version(versionResolver),
             newConfiguration("org.apache.felix.http")
                 .put("org.osgi.service.http.port", httpPort)
                 .asOption(),
-            newConfiguration("org.apache.jackrabbit.oak.plugins.segment.SegmentNodeStoreService")
+            newConfiguration("org.apache.jackrabbit.oak.segment.SegmentNodeStoreService")
                 .put("repository.home", repositoryHome)
                 .put("name", "Default NodeStore")
                 .asOption(),
             newConfiguration("org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProviderService")
                 .put("localIndexDir", localIndexDir)
+                .asOption(),
+            mavenBundle().groupId("org.slf4j").artifactId("log4j-over-slf4j").version(versionResolver) // OAK-5921
+        );
+    }
+
+    public static Option slingLaunchpadOakMongo(final String workingDirectory, final int httpPort, final String mongouri) {
+        final String slingHome = String.format("%s/sling", workingDirectory);
+        final String repositoryHome = String.format("%s/repository", slingHome);
+        final String localIndexDir = String.format("%s/index", repositoryHome);
+        return composite(
+            slingLaunchpadOak(),
+            mavenBundle().groupId("org.apache.jackrabbit").artifactId("oak-lucene").version(versionResolver),
+            mavenBundle().groupId("org.mongodb").artifactId("mongo-java-driver").version(versionResolver),
+            mavenBundle().groupId("com.h2database").artifactId("h2-mvstore").version(versionResolver),
+            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.oak.server").version(versionResolver),
+            newConfiguration("org.apache.jackrabbit.oak.plugins.index.lucene.LuceneIndexProviderService")
+                .put("localIndexDir", localIndexDir)
+                .asOption(),
+            newConfiguration("org.apache.jackrabbit.oak.plugins.document.DocumentNodeStoreService")
+                .put("db", "sling")
+                .put("mongouri", mongouri)
                 .asOption()
         );
     }

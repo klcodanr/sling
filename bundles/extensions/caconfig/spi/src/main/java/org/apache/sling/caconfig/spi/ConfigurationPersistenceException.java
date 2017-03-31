@@ -24,7 +24,7 @@ import org.osgi.annotation.versioning.ProviderType;
  * Is thrown when configuration cannot be persisted.
  */
 @ProviderType
-public final class ConfigurationPersistenceException extends RuntimeException {
+public class ConfigurationPersistenceException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public ConfigurationPersistenceException(String message, Throwable cause) {

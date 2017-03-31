@@ -42,11 +42,13 @@ import org.apache.maven.MavenExecutionException;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
 import org.apache.maven.artifact.resolver.ArtifactResolver;
+import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.sling.commons.osgi.BSNRenamer;
 import org.apache.sling.provisioning.model.ArtifactGroup;
@@ -65,7 +67,7 @@ import org.codehaus.plexus.archiver.manager.NoSuchArchiverException;
 import org.codehaus.plexus.util.FileUtils;
 
 /**
- * Prepare the sling start applications.
+ * Prepare the packaging of the Sling quickstart artifact (either JAR or WAR).
  */
 @Mojo(
         name = "prepare-package",
@@ -94,6 +96,12 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
     private static final String PROPERTIES_FILE = "sling_install.properties";
 
     /**
+     * If set to {@code true} creates a WAR artifact in addition to the standalone JAR from the model.
+     */
+    @Parameter(defaultValue="false")
+    protected boolean createWebapp;
+
+    /**
      * To look up Archiver/UnArchiver implementations
      */
     @Component
@@ -108,6 +116,9 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
      */
     @Component
     private ArtifactResolver resolver;
+
+    @Parameter(defaultValue = "${mojoExecution}", readonly = true, required = true)
+    protected MojoExecution mojoExecution;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -263,8 +274,25 @@ public class PreparePackageMojo extends AbstractSlingStartMojo {
                             break;
                         }
                     }
-                    if ( artifact == null ) {
-                        throw new MojoExecutionException("Unable to find artifact from same project: " + a.toMvnUrl());
+                    // check if the artifact is bound already?
+                    if (project.getArtifact().getFile().exists()) {
+                        if (a.getClassifier() != null) {
+                            if (a.getClassifier().equals(project.getArtifact().getClassifier())) {
+                                artifact = project.getArtifact();
+                            } else {
+                                throw new MojoExecutionException(
+                                        "Unable to find artifact from same project with the given classifier: " + a.toMvnUrl());
+                            }
+                        } else {
+                            if (project.getArtifact().getClassifier() == null) {
+                                artifact = project.getArtifact();
+                            } else {
+                                throw new MojoExecutionException("Unable to find artifact with no classifier from same project, because the main artifact is bound to classifier " + project.getArtifact().getClassifier());
+                            }
+                        }
+                    } else {
+                        throw new MojoExecutionException("You must not reference artifact " + a.toMvnUrl()
+                                + " from the model which is not yet available in the phase '" + mojoExecution.getLifecyclePhase()+ ". Make sure to execute this goal after phase 'package'");
                     }
                 } else {
                     artifact = ModelUtils.getArtifact(this.project, this.mavenSession, this.artifactHandlerManager, this.resolver,

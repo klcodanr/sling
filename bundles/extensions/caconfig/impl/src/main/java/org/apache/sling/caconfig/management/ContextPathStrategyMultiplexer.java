@@ -23,7 +23,9 @@ import org.apache.sling.caconfig.resource.spi.ContextPathStrategy;
 /**
  * Detects all {@link ContextPathStrategy} implementations in the container
  * and consolidates their result based on service ranking.
+ * @deprecated Please use {@link org.apache.sling.caconfig.management.multiplexer.ContextPathStrategyMultiplexer} instead.
  */
+@Deprecated
 public interface ContextPathStrategyMultiplexer extends ContextPathStrategy {
 
     // inherits all methods from {@link ContextPathStrategy}

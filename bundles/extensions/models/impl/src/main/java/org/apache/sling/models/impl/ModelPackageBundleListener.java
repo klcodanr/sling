@@ -26,6 +26,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.adapter.AdapterFactory;
@@ -143,6 +144,8 @@ public class ModelPackageBundleListener implements BundleTrackerCustomizer {
                 Class<?>[] adapterTypes = annotation.adapters();
                 if (adapterTypes.length == 0) {
                     adapterTypes = new Class<?>[] { implType };
+                } else if (!ArrayUtils.contains(adapterTypes, implType)) {
+                    adapterTypes = (Class<?>[]) ArrayUtils.add(adapterTypes, implType);
                 }
                 // register adapter only if given adapters are valid
                 if (validateAdapterClasses(implType, adapterTypes)) {
@@ -156,12 +159,12 @@ public class ModelPackageBundleListener implements BundleTrackerCustomizer {
                     for (String resourceType : resourceTypes) {
                         if (StringUtils.isNotEmpty(resourceType)) {
                             for (Class<?> adaptable : annotation.adaptables()) {
-                                adapterImplementations.registerModelToResourceType(bundle, resourceType, adaptable, adapterTypes[0]);
+                                adapterImplementations.registerModelToResourceType(bundle, resourceType, adaptable, implType);
                                 ExportServlet.ExportedObjectAccessor accessor = null;
                                 if (adaptable == Resource.class) {
-                                    accessor = ExportServlet.RESOURCE_ACCESSOR;
+                                    accessor = new ExportServlet.ResourceAccessor(implType);
                                 } else if (adaptable == SlingHttpServletRequest.class) {
-                                    accessor = ExportServlet.REQUEST_ACCESSOR;
+                                    accessor = new ExportServlet.RequestAccessor(implType);
                                 }
                                 Exporter exporterAnnotation = implType.getAnnotation(Exporter.class);
                                 if (exporterAnnotation != null) {

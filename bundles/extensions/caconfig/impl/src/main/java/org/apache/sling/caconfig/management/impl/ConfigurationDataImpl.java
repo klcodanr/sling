@@ -30,16 +30,17 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceUtil;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.api.wrappers.ValueMapDecorator;
-import org.apache.sling.caconfig.impl.override.ConfigurationOverrideManager;
 import org.apache.sling.caconfig.management.ConfigurationData;
 import org.apache.sling.caconfig.management.ConfigurationManager;
 import org.apache.sling.caconfig.management.ValueInfo;
+import org.apache.sling.caconfig.management.multiplexer.ConfigurationOverrideMultiplexer;
 import org.apache.sling.caconfig.resource.impl.util.PropertiesFilterUtil;
-import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy;
+import org.apache.sling.caconfig.spi.ConfigurationPersistenceStrategy2;
 import org.apache.sling.caconfig.spi.metadata.ConfigurationMetadata;
 import org.apache.sling.caconfig.spi.metadata.PropertyMetadata;
 
@@ -52,8 +53,8 @@ final class ConfigurationDataImpl implements ConfigurationData {
     private final Resource contextResource;
     private final String configName;
     private final ConfigurationManager configurationManager;
-    private final ConfigurationOverrideManager configurationOverrideManager;
-    private final ConfigurationPersistenceStrategy configurationPersistenceStrategy;
+    private final ConfigurationOverrideMultiplexer configurationOverrideMultiplexer;
+    private final ConfigurationPersistenceStrategy2 configurationPersistenceStrategy;
     private final boolean configResourceCollection;
     private final String collectionItemName;
     private final boolean isAllOverridden;
@@ -67,8 +68,8 @@ final class ConfigurationDataImpl implements ConfigurationData {
             Resource resolvedConfigurationResource, Resource writebackConfigurationResource,
             Iterator<Resource> configurationResourceInheritanceChain,
             Resource contextResource, String configName,
-            ConfigurationManager configurationManager, ConfigurationOverrideManager configurationOverrideManager,
-            ConfigurationPersistenceStrategy configurationPersistenceStrategy,
+            ConfigurationManager configurationManager, ConfigurationOverrideMultiplexer configurationOverrideMultiplexer,
+            ConfigurationPersistenceStrategy2 configurationPersistenceStrategy,
             boolean configResourceCollection, String collectionItemName) {
         this.configMetadata = configMetadata;
         this.resolvedConfigurationResource = resolvedConfigurationResource;
@@ -78,21 +79,21 @@ final class ConfigurationDataImpl implements ConfigurationData {
         this.contextResource = contextResource;
         this.configName = configName;
         this.configurationManager = configurationManager;
-        this.configurationOverrideManager = configurationOverrideManager;
+        this.configurationOverrideMultiplexer = configurationOverrideMultiplexer;
         this.configurationPersistenceStrategy = configurationPersistenceStrategy;
         this.configResourceCollection = configResourceCollection;
         this.collectionItemName = collectionItemName;
-        this.isAllOverridden = contextResource != null ? configurationOverrideManager.isAllOverridden(contextResource.getPath(), configName) : false;
+        this.isAllOverridden = contextResource != null ? configurationOverrideMultiplexer.isAllOverridden(contextResource.getPath(), configName) : false;
     }
 
     public ConfigurationDataImpl(ConfigurationMetadata configMetadata,
             Resource contextResource, String configName,
-            ConfigurationManager configurationManager, ConfigurationOverrideManager configurationOverrideManager,
-            ConfigurationPersistenceStrategy configurationPersistenceStrategy,
+            ConfigurationManager configurationManager, ConfigurationOverrideMultiplexer configurationOverrideMultiplexer,
+            ConfigurationPersistenceStrategy2 configurationPersistenceStrategy,
             boolean configResourceCollection) {
         this(configMetadata, null, null, null,
                 contextResource, configName,
-                configurationManager, configurationOverrideManager,
+                configurationManager, configurationOverrideMultiplexer,
                 configurationPersistenceStrategy,
                 configResourceCollection, null);
     }
@@ -175,12 +176,16 @@ final class ConfigurationDataImpl implements ConfigurationData {
         for (PropertyMetadata<?> propertyMetadata : configMetadata.getPropertyMetadata().values()) {
             if (propertyMetadata.isNestedConfiguration()) {
                 ConfigurationMetadata nestedConfigMetadata = propertyMetadata.getConfigurationMetadata();
+                String relatedConfigPath = resolvedConfigurationResource != null ? resolvedConfigurationResource.getPath() : null;
                 String nestedConfigName;
                 if (configResourceCollection) {
-                    nestedConfigName = configurationPersistenceStrategy.getResourcePath(configName + "/" + getCollectionItemName()) + "/" + nestedConfigMetadata.getName();
+                    String collectionItemName = StringUtils.defaultString(getCollectionItemName(), "newItem");
+                    nestedConfigName = configurationPersistenceStrategy.getCollectionParentConfigName(configName, relatedConfigPath)
+                            + "/" + configurationPersistenceStrategy.getCollectionItemConfigName(collectionItemName, relatedConfigPath)
+                            + "/" + nestedConfigMetadata.getName();
                 }
                 else {
-                    nestedConfigName = configurationPersistenceStrategy.getResourcePath(configName) + "/" + nestedConfigMetadata.getName();
+                    nestedConfigName = configurationPersistenceStrategy.getConfigName(configName, relatedConfigPath) + "/" + nestedConfigMetadata.getName();
                 }
                 if (propertyMetadata.getType().equals(ConfigurationMetadata.class)) {
                     ConfigurationData configData = configurationManager.getConfiguration(contextResource, nestedConfigName);
@@ -224,7 +229,7 @@ final class ConfigurationDataImpl implements ConfigurationData {
                 configurationResourceInheritanceChain,
                 contextResource,
                 configName,
-                configurationOverrideManager,
+                configurationOverrideMultiplexer,
                 isAllOverridden);
     }
     

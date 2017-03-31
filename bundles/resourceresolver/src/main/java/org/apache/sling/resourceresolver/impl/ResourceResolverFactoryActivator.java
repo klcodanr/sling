@@ -30,8 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.collections.BidiMap;
-import org.apache.commons.collections.bidimap.TreeBidiMap;
+import org.apache.commons.collections4.BidiMap;
+import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.sling.api.resource.ResourceDecorator;
 import org.apache.sling.api.resource.ResourceResolverFactory;
 import org.apache.sling.api.resource.path.Path;
@@ -250,7 +250,7 @@ public class ResourceResolverFactoryActivator {
         }
         virtualURLMap = virtuals;
 
-        final List<Mapping> maps = new ArrayList<Mapping>();
+        final List<Mapping> maps = new ArrayList<>();
         for (int i = 0; config.resource_resolver_mapping() != null && i < config.resource_resolver_mapping().length; i++) {
             maps.add(new Mapping(config.resource_resolver_mapping()[i]));
         }
@@ -297,7 +297,7 @@ public class ResourceResolverFactoryActivator {
         this.vanityPathWhiteList = null;
         String[] vanityPathPrefixes = config.resource_resolver_vanitypath_whitelist();
         if ( vanityPathPrefixes != null ) {
-            final List<String> prefixList = new ArrayList<String>();
+            final List<String> prefixList = new ArrayList<>();
             for(final String value : vanityPathPrefixes) {
                 if ( value.trim().length() > 0 ) {
                     if ( value.trim().endsWith("/") ) {
@@ -315,7 +315,7 @@ public class ResourceResolverFactoryActivator {
         this.vanityPathBlackList = null;
         vanityPathPrefixes = config.resource_resolver_vanitypath_blacklist();
         if ( vanityPathPrefixes != null ) {
-            final List<String> prefixList = new ArrayList<String>();
+            final List<String> prefixList = new ArrayList<>();
             for(final String value : vanityPathPrefixes) {
                 if ( value.trim().length() > 0 ) {
                     if ( value.trim().endsWith("/") ) {
@@ -336,15 +336,7 @@ public class ResourceResolverFactoryActivator {
 
         boolean hasLegacyRequiredProvider = false;
         if ( requiredResourceProvidersLegacy != null ) {
-            for(final String name : requiredResourceProvidersLegacy) {
-            	if ( name.equals(ResourceResolverFactoryConfig.LEGACY_REQUIRED_PROVIDER_PID)) {
-                	hasLegacyRequiredProvider = true;
-                	break;
-            	}
-            }
-            if ( hasLegacyRequiredProvider ) {
-            	requiredResourceProvidersLegacy.remove(ResourceResolverFactoryConfig.LEGACY_REQUIRED_PROVIDER_PID);
-            }
+            hasLegacyRequiredProvider = requiredResourceProvidersLegacy.remove(ResourceResolverFactoryConfig.LEGACY_REQUIRED_PROVIDER_PID);
             if ( !requiredResourceProvidersLegacy.isEmpty() ) {
                 logger.error("ResourceResolverFactory is using deprecated required providers configuration (resource.resolver.required.providers" +
                         "). Please change to use the property resource.resolver.required.providernames for values: " + requiredResourceProvidersLegacy);
@@ -363,11 +355,11 @@ public class ResourceResolverFactoryActivator {
         	if ( hasRequiredProvider ) {
                 logger.warn("ResourceResolverFactory is using deprecated required providers configuration (resource.resolver.required.providers" +
                         ") with value '" + ResourceResolverFactoryConfig.LEGACY_REQUIRED_PROVIDER_PID + ". Please remove this configuration property. " +
-                        ResourceResolverFactoryConfig.REQUIRED_PROVIDER_NAME + " is already contained in the property resource.resolver.required.providernames.");        		        		
+                        ResourceResolverFactoryConfig.REQUIRED_PROVIDER_NAME + " is already contained in the property resource.resolver.required.providernames.");
         	} else {
                 logger.warn("ResourceResolverFactory is using deprecated required providers configuration (resource.resolver.required.providers" +
                         ") with value '" + ResourceResolverFactoryConfig.LEGACY_REQUIRED_PROVIDER_PID + ". Please remove this configuration property and add " +
-                        ResourceResolverFactoryConfig.REQUIRED_PROVIDER_NAME + " to the property resource.resolver.required.providernames.");        		
+                        ResourceResolverFactoryConfig.REQUIRED_PROVIDER_NAME + " to the property resource.resolver.required.providernames.");
         	}
         }
 
@@ -375,9 +367,9 @@ public class ResourceResolverFactoryActivator {
         if ( this.resourceProviderTracker == null ) {
             this.resourceProviderTracker = new ResourceProviderTracker();
             this.changeListenerWhiteboard = new ResourceChangeListenerWhiteboard();
-            this.preconds.activate(this.bundleContext, 
-            		requiredResourceProvidersLegacy, 
-            		requiredResourceProviderNames, 
+            this.preconds.activate(this.bundleContext,
+            		requiredResourceProvidersLegacy,
+            		requiredResourceProviderNames,
             		resourceProviderTracker);
             this.changeListenerWhiteboard.activate(this.bundleContext,
                 this.resourceProviderTracker, searchPath);
@@ -404,9 +396,9 @@ public class ResourceResolverFactoryActivator {
                         }
                     });
         } else {
-            this.preconds.activate(this.bundleContext, 
-            		requiredResourceProvidersLegacy, 
-            		requiredResourceProviderNames, 
+            this.preconds.activate(this.bundleContext,
+            		requiredResourceProvidersLegacy,
+            		requiredResourceProviderNames,
             		resourceProviderTracker);
             this.checkFactoryPreconditions(null, null);
          }
@@ -485,7 +477,7 @@ public class ResourceResolverFactoryActivator {
 
         if ( localContext != null ) {
             // activate and register factory
-            final Dictionary<String, Object> serviceProps = new Hashtable<String, Object>();
+            final Dictionary<String, Object> serviceProps = new Hashtable<>();
             serviceProps.put(Constants.SERVICE_VENDOR, "The Apache Software Foundation");
             serviceProps.put(Constants.SERVICE_DESCRIPTION, "Apache Sling Resource Resolver Factory");
 
@@ -529,11 +521,11 @@ public class ResourceResolverFactoryActivator {
     public ServiceUserMapper getServiceUserMapper() {
     	return this.serviceUserMapper;
     }
-    
+
     public BundleContext getBundleContext() {
     	return this.bundleContext;
     }
-    
+
     /**
      * Check the preconditions and if it changed, either register factory or unregister
      */
@@ -601,7 +593,7 @@ public class ResourceResolverFactoryActivator {
     	}
     	return set.isEmpty() ? null : set;
     }
-    
+
     public static ResourceResolverFactoryConfig DEFAULT_CONFIG;
 
     static {

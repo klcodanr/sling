@@ -19,15 +19,17 @@
 
 package org.apache.sling.jobs.impl;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.apache.felix.scr.annotations.ReferencePolicy;
-import org.apache.felix.scr.annotations.Service;
+import java.io.Closeable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.sling.jobs.Job;
 import org.apache.sling.jobs.JobBuilder;
 import org.apache.sling.jobs.JobCallback;
@@ -41,23 +43,19 @@ import org.apache.sling.jobs.impl.storage.InMemoryJobStorage;
 import org.apache.sling.mom.QueueManager;
 import org.apache.sling.mom.TopicManager;
 import org.osgi.framework.ServiceReference;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.io.Closeable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * NB, this does *not* register as a JobConsumer service. it implements a JobConsumer so that it can consume Jobs from JobQueueConsumers.
  */
-@Component(immediate = true)
-@Service(value =  JobManager.class)
+@Component(service = JobManager.class, immediate=true)
 public class JobSubsystem  implements JobManager, JobConsumer {
 
 
@@ -69,11 +67,6 @@ public class JobSubsystem  implements JobManager, JobConsumer {
     /**
      * Contains a map of JobConsumers wrapped by JobConsumerHolders keyed by ServiceReference.
      */
-    @Reference(referenceInterface = JobConsumer.class,
-            cardinality = ReferenceCardinality.OPTIONAL_MULTIPLE,
-            policy = ReferencePolicy.DYNAMIC,
-            bind="addConsumer",
-            unbind="removeConsumer")
     private final Map<ServiceReference<JobConsumer>, JobConsumerHolder> registrations =
             new ConcurrentHashMap<ServiceReference<JobConsumer>, JobConsumerHolder>();
 
@@ -83,14 +76,14 @@ public class JobSubsystem  implements JobManager, JobConsumer {
     private QueueManager queueManager;
 
     @Activate
-    public synchronized void activate(@SuppressWarnings("UnusedParameters") Map<String, Object> properties) {
+    public synchronized void activate() {
         jobStorage = new InMemoryJobStorage();
         messageSender = new OutboundJobUpdateListener(topicManager, queueManager);
         manager = new JobManagerImpl(jobStorage, messageSender);
     }
 
     @Deactivate
-    public synchronized void deactivate(@SuppressWarnings("UnusedParameters") Map<String, Object> properties) {
+    public synchronized void deactivate() {
         for (Map.Entry<ServiceReference<JobConsumer>, JobConsumerHolder> e : registrations.entrySet()) {
             e.getValue().close();
         }
@@ -132,21 +125,17 @@ public class JobSubsystem  implements JobManager, JobConsumer {
 
     // ---- JobConsumer Registration
     // Register Consumers using
+    @Reference(service = JobConsumer.class,
+            cardinality = ReferenceCardinality.MULTIPLE,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind="removeConsumer")
     public synchronized  void addConsumer(ServiceReference<JobConsumer> serviceRef) {
         if (registrations.containsKey(serviceRef)) {
             LOGGER.error("Registration for service reference is already present {}",serviceRef);
             return;
         }
-        JobConsumerHolder jobConsumerHolder = new JobConsumerHolder(serviceRef.getBundle().getBundleContext().getService(serviceRef), getServiceProperties(serviceRef));
+        JobConsumerHolder jobConsumerHolder = new JobConsumerHolder(serviceRef.getBundle().getBundleContext().getService(serviceRef), serviceRef);
         registrations.put(serviceRef, jobConsumerHolder);
-    }
-
-    private Map<Object, Object> getServiceProperties(ServiceReference<JobConsumer> serviceRef) {
-        ImmutableMap.Builder<Object, Object> builder = ImmutableMap.builder();
-        for ( String k : serviceRef.getPropertyKeys()) {
-            builder.put(k, serviceRef.getProperty(k));
-        }
-        return builder.build();
     }
 
     public synchronized void removeConsumer(ServiceReference<JobConsumer> serviceRef) {
@@ -182,17 +171,17 @@ public class JobSubsystem  implements JobManager, JobConsumer {
         private final JobConsumer consumer;
         private final Set<Types.JobType> jobTypes;
 
-        public JobConsumerHolder(JobConsumer consumer, Map<Object, Object> properties) {
+        public JobConsumerHolder(JobConsumer consumer, ServiceReference<JobConsumer> ref) {
             this.consumer = consumer;
             if ( consumer instanceof JobTypeValve) {
-                jobTypes = ImmutableSet.of();
+                jobTypes = Collections.emptySet();
             } else {
-                jobTypes = getJobTypes(properties);
+                jobTypes = getJobTypes(ref);
             }
         }
 
-        public Set<Types.JobType> getJobTypes(Map<Object, Object> properties) {
-            Object types = properties.get(JobConsumer.JOB_TYPES);
+        public Set<Types.JobType> getJobTypes(ServiceReference<JobConsumer> ref) {
+            Object types = ref.getProperty(JobConsumer.JOB_TYPES);
             if (types instanceof String) {
                 return Types.jobType(new String[]{(String) types});
 
@@ -204,7 +193,7 @@ public class JobSubsystem  implements JobManager, JobConsumer {
                 for (Object o : (Iterable<?>) types) {
                     l.add(String.valueOf(o));
                 }
-                return Types.jobType((String[]) l.toArray(new String[l.size()]));
+                return Types.jobType(l.toArray(new String[l.size()]));
             }
             throw new IllegalArgumentException("For the JobConsumer to work, the job consumer must either " +
                     "implement a JobTypeValve or define a list of JobTypes, neither were specified. " +
@@ -223,6 +212,7 @@ public class JobSubsystem  implements JobManager, JobConsumer {
             return jobTypes.contains(jobType);
         }
 
+        @Override
         public void close() {
             // nothing to do at the moment.
         }

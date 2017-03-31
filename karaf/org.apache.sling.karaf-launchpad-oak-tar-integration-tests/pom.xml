@@ -24,7 +24,7 @@
   <parent>
     <groupId>org.apache.sling</groupId>
     <artifactId>sling</artifactId>
-    <version>29</version>
+    <version>30</version>
     <relativePath/>
   </parent>
 
@@ -36,10 +36,16 @@
   <description>Launchpad Integration Tests for Apache Sling with Oak Tar on Karaf</description>
 
   <properties>
-    <org.apache.karaf.version>4.1.0</org.apache.karaf.version>
+    <org.apache.karaf.version>4.1.1</org.apache.karaf.version>
     <org.ops4j.pax.exam.version>4.10.0</org.ops4j.pax.exam.version>
     <repoinit.filename>${project.basedir}/src/test/resources/repoinit.txt</repoinit.filename>
   </properties>
+
+  <scm>
+    <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/karaf/org.apache.sling.karaf-launchpad-oak-tar-integration-tests</connection>
+    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/karaf/org.apache.sling.karaf-launchpad-oak-tar-integration-tests</developerConnection>
+    <url>http://svn.apache.org/viewvc/sling/trunk/karaf/org.apache.sling.karaf-launchpad-oak-tar-integration-tests</url>
+  </scm>
 
   <dependencies>
     <!-- javax -->

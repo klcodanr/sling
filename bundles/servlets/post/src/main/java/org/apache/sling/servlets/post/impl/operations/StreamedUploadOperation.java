@@ -17,6 +17,16 @@
 
 package org.apache.sling.servlets.post.impl.operations;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.ServletContext;
+import javax.servlet.http.Part;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.jackrabbit.util.Text;
 import org.apache.sling.api.SlingHttpServletRequest;
@@ -24,22 +34,11 @@ import org.apache.sling.api.resource.PersistenceException;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.resource.ResourceUtil;
-import org.apache.sling.servlets.post.AbstractPostOperation;
 import org.apache.sling.servlets.post.Modification;
 import org.apache.sling.servlets.post.PostResponse;
 import org.apache.sling.servlets.post.impl.helper.StreamedChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.jcr.RepositoryException; // required due to AbstractPostOperation signature.
-import javax.servlet.ServletContext;
-import javax.servlet.http.Part;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Performs a streamed modification of the content.
@@ -76,36 +75,30 @@ public class StreamedUploadOperation extends AbstractPostOperation {
     }
 
     @Override
-    protected void doRun(SlingHttpServletRequest request, PostResponse response, List<Modification> changes) throws RepositoryException {
-        try {
-            Iterator<Part> partsIterator = (Iterator<Part>) request.getAttribute("request-parts-iterator");
-            Map<String, List<String>> formFields = new HashMap<String, List<String>>();
-            boolean streamingBodies = false;
-            while (partsIterator.hasNext()) {
-                Part part = partsIterator.next();
-                String name = part.getName();
+    protected void doRun(SlingHttpServletRequest request, PostResponse response, List<Modification> changes)
+    throws PersistenceException {
+        @SuppressWarnings("unchecked")
+        Iterator<Part> partsIterator = (Iterator<Part>) request.getAttribute("request-parts-iterator");
+        Map<String, List<String>> formFields = new HashMap<>();
+        boolean streamingBodies = false;
+        while (partsIterator.hasNext()) {
+            Part part = partsIterator.next();
+            String name = part.getName();
 
-                if (isFormField(part)) {
-                    addField(formFields, name, part);
-                    if (streamingBodies) {
-                        LOG.warn("Form field {} was sent after the bodies started to be streamed. " +
-                                "Will not have been available to all streamed bodies. " +
-                                "It is recommended to send all form fields before streamed bodies in the POST ", name);
-                    }
-                } else {
-                    streamingBodies = true;
-                    // process the file body and commit.
-                    writeContent(request.getResourceResolver(), part, formFields, response, changes);
-
+            if (isFormField(part)) {
+                addField(formFields, name, part);
+                if (streamingBodies) {
+                    LOG.warn("Form field {} was sent after the bodies started to be streamed. " +
+                            "Will not have been available to all streamed bodies. " +
+                            "It is recommended to send all form fields before streamed bodies in the POST ", name);
                 }
-            }
-        } catch ( final PersistenceException pe) {
-            if ( pe.getCause() instanceof RepositoryException ) {
-                throw (RepositoryException)pe.getCause();
-            }
-            throw new RepositoryException(pe);
-        }
+            } else {
+                streamingBodies = true;
+                // process the file body and commit.
+                writeContent(request.getResourceResolver(), part, formFields, response, changes);
 
+            }
+        }
     }
 
     /**
@@ -117,7 +110,7 @@ public class StreamedUploadOperation extends AbstractPostOperation {
     private void addField(Map<String, List<String>> formFields, String name, Part part) {
         List<String> values = formFields.get(name);
         if ( values == null ) {
-            values = new ArrayList<String>();
+            values = new ArrayList<>();
             formFields.put(name, values);
         }
         try {
@@ -153,7 +146,7 @@ public class StreamedUploadOperation extends AbstractPostOperation {
         }
         String name = getUploadName(part);
         Resource fileResource = parentResource.getChild(name);
-        Map<String, Object> fileProps = new HashMap<String, Object>();
+        Map<String, Object> fileProps = new HashMap<>();
         if (fileResource == null) {
             fileProps.put("jcr:primaryType", NT_FILE);
             fileResource = parentResource.getResourceResolver().create(parentResource, name, fileProps);

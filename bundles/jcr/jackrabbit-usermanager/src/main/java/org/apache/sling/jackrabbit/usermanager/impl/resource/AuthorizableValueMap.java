@@ -32,6 +32,7 @@ import java.util.Set;
 import javax.jcr.Property;
 import javax.jcr.PropertyType;
 import javax.jcr.RepositoryException;
+import javax.jcr.UnsupportedRepositoryOperationException;
 import javax.jcr.Value;
 import javax.jcr.ValueFormatException;
 
@@ -54,7 +55,9 @@ public class AuthorizableValueMap implements ValueMap {
 
     private static final String MEMBER_OF_KEY = "memberOf";
 
-    private Logger logger = LoggerFactory.getLogger(AuthorizableValueMap.class);
+    private static final String PATH_KEY = "path";
+
+    private static final Logger LOG = LoggerFactory.getLogger(AuthorizableValueMap.class);
 
     private boolean fullyRead;
 
@@ -152,12 +155,14 @@ public class AuthorizableValueMap implements ValueMap {
                 return getMembers((Group) authorizable, false);
             }
             if (key.equals(MEMBER_OF_KEY)) {
-                return getMemberships(authorizable, true);
+                return getMemberships(true);
             }
             if (key.equals(DECLARED_MEMBER_OF_KEY)) {
-                return getMemberships(authorizable, false);
+                return getMemberships(false);
             }
-
+            if (key.equals(PATH_KEY)) {
+                return getPath();
+            }
             if (authorizable.hasProperty(key)) {
                 final Value[] property = authorizable.getProperty(key);
                 final Object value = valuesToJavaObject(property);
@@ -165,7 +170,7 @@ public class AuthorizableValueMap implements ValueMap {
                 return value;
             }
         } catch (RepositoryException re) {
-            // TODO: log !!
+            LOG.error("Could not access authorizable property", re);
         }
 
         // property not found or some error accessing it
@@ -224,9 +229,14 @@ public class AuthorizableValueMap implements ValueMap {
                     cache.put(MEMBERS_KEY, getMembers((Group) authorizable, true));
                     cache.put(DECLARED_MEMBERS_KEY, getMembers((Group) authorizable, false));
                 }
-                cache.put(MEMBER_OF_KEY, getMemberships(authorizable, true));
-                cache.put(DECLARED_MEMBER_OF_KEY, getMemberships(authorizable, false));
+                cache.put(MEMBER_OF_KEY, getMemberships(true));
+                cache.put(DECLARED_MEMBER_OF_KEY, getMemberships(false));
 
+                String path = getPath();
+                if (path != null) {
+                    cache.put(PATH_KEY, path);
+                }
+                // only direct property
                 Iterator<String> pi = authorizable.getPropertyNames();
                 while (pi.hasNext()) {
                     String key = (String) pi.next();
@@ -239,7 +249,7 @@ public class AuthorizableValueMap implements ValueMap {
 
                 fullyRead = true;
             } catch (RepositoryException re) {
-                // TODO: log !!
+                LOG.error("Could not access certain properties of user {}", authorizable, re);
             }
         }
     }
@@ -308,10 +318,10 @@ public class AuthorizableValueMap implements ValueMap {
             }
 
         } catch (ValueFormatException vfe) {
-            logger.info("converToType: Cannot convert value of " + name
+            LOG.info("converToType: Cannot convert value of " + name
                 + " to " + type, vfe);
         } catch (RepositoryException re) {
-            logger.info("converToType: Cannot get value of " + name, re);
+            LOG.info("converToType: Cannot get value of " + name, re);
         }
 
         // fall back to nothing
@@ -393,7 +403,7 @@ public class AuthorizableValueMap implements ValueMap {
         return results.toArray(new String[results.size()]);
     }
 
-    private String[] getMemberships(Authorizable authorizable, boolean includeAll) throws RepositoryException {
+    private String[] getMemberships(boolean includeAll) throws RepositoryException {
         List<String> results = new ArrayList<String>();
         for (Iterator<Group> it = includeAll ? authorizable.memberOf() : authorizable.declaredMemberOf();
                 it.hasNext();) {
@@ -403,6 +413,15 @@ public class AuthorizableValueMap implements ValueMap {
         return results.toArray(new String[results.size()]);
     }
     
+    private String getPath() throws RepositoryException {
+        try {
+            return authorizable.getPath();
+        } catch (UnsupportedRepositoryOperationException e) {
+            LOG.debug("Could not retrieve path of authorizable {}", authorizable, e);
+            return null;
+        }
+    }
+
     public static class LazyInputStream extends InputStream {
 
         /** The JCR Value from which the input stream is requested on demand */

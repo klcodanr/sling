@@ -9,30 +9,29 @@
     License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS 
     OF ANY KIND, either express or implied. See the License for the specific 
     language governing permissions and limitations under the License. -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>28</version>
+        <version>30</version>
         <relativePath />
     </parent>
 
     <artifactId>org.apache.sling.installer.hc</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
     <name>Apache Sling Installer Health Checks</name>
     <description> 
-        Provides Sling health checks related to the Sling Installer.
+        Provides Sling Health Checks related to the Sling Installer.
     </description>
 
     <scm>
-        <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/installer/healthcheck</connection>
-        <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/installer/healthcheck</developerConnection>
-        <url>http://svn.apache.org/viewvc/sling/installer/healthcheck</url>
+        <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/installer/hc</connection>
+        <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/installer/hc</developerConnection>
+        <url>http://svn.apache.org/viewvc/sling/trunk/installer/hc</url>
     </scm>
 
     <!-- make compile with java 7 -->
@@ -58,10 +57,12 @@
         <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>osgi.core</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>osgi.cmpn</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.sling</groupId>
@@ -86,6 +87,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.felix</groupId>
